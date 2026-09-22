@@ -4,91 +4,53 @@ import 'package:juego_brilliant/tipo.dart';
 void main() {
   group('Pruebas de colores', () {
     test('Azul acepta si todos son iguales', () {
-      final zonaAzul = Tipo(
-        tipo: TipoZona.azul,
-        color: 'Azul',
-        regla: 'Todos iguales',
-        puntuacion: 10,
-      );
+      final zonaAzul = TipoAzul();
 
-      expect(zonaAzul.validarMovimiento([]), isTrue);
-      expect(zonaAzul.validarMovimiento([4, 4, 4]), isTrue);
-      expect(zonaAzul.validarMovimiento([4, 5, 4]), isFalse);
+      expect(zonaAzul.esPosibleAgregar([], 4), isTrue);
+      expect(zonaAzul.esPosibleAgregar([4, 4], 4), isTrue);
+      expect(zonaAzul.esPosibleAgregar([4, 5], 4), isFalse);
     });
 
     test('Rojo no deja repetir números', () {
-      final zonaRoja = Tipo(
-        tipo: TipoZona.rojo,
-        color: 'Rojo',
-        regla: 'Todos diferentes',
-        puntuacion: 10,
-      );
+      final zonaRoja = TipoRojo();
 
-      expect(zonaRoja.validarMovimiento([1, 2, 3, 4]), isTrue);
-      expect(zonaRoja.validarMovimiento([1, 2, 3, 1]), isFalse);
+      expect(zonaRoja.esPosibleAgregar([1, 2, 3], 4), isTrue);
+      expect(zonaRoja.esPosibleAgregar([1, 2, 3], 1), isFalse);
     });
 
     test('Verde acepta cualquier cosa', () {
-      final zonaVerde = Tipo(
-        tipo: TipoZona.verde,
-        color: 'Verde',
-        regla: 'Libre',
-        puntuacion: 10,
-      );
+      final zonaVerde = TipoVerde();
 
-      expect(zonaVerde.validarMovimiento([5, 5, 9, 1]), isTrue);
-      expect(zonaVerde.validarMovimiento([7, 7, 7, 7]), isTrue);
+      expect(zonaVerde.esPosibleAgregar([5, 5, 9], 1), isTrue);
+      expect(zonaVerde.esPosibleAgregar([7, 7, 7], 7), isTrue);
     });
 
     test('Morado solo deja dos números distintos', () {
-      final zonaMorada = Tipo(
-        tipo: TipoZona.morado,
-        color: 'Morado',
-        regla: 'Dos números máximo',
-        puntuacion: 10,
-      );
+      final zonaMorada = TipoMorado();
 
-      expect(zonaMorada.validarMovimiento([2, 8, 2, 8]), isTrue);
-      expect(zonaMorada.validarMovimiento([2, 8, 5]), isFalse);
+      expect(zonaMorada.esPosibleAgregar([2, 8, 2], 8), isTrue);
+      expect(zonaMorada.esPosibleAgregar([2, 8], 5), isFalse);
     });
 
     test('Amarillo revisa que no se repita número', () {
-      final zonaAmarilla = Tipo(
-        tipo: TipoZona.amarillo,
-        color: 'Amarillo',
-        regla: 'Sin repetir',
-        puntuacion: 10,
-      );
+      final zonaAmarilla = TipoAmarillo();
 
-      expect(zonaAmarilla.validarAmarillo([10, 20, 30]), isTrue);
-      expect(zonaAmarilla.validarAmarillo([10, 20, 10]), isFalse);
+      expect(zonaAmarilla.esPosibleAgregar([10, 20], 30), isTrue);
+      expect(zonaAmarilla.esPosibleAgregar([10, 20], 10), isFalse);
     });
   });
 
   group('Otras pruebas', () {
     test('Devuelve bien los puntos', () {
-      final tipoConfig = Tipo(
-        tipo: TipoZona.verde,
-        color: 'Verde',
-        regla: 'Libre',
-        puntuacion: 25,
-      );
+      final tipoConfig = TipoVerde();
 
-      expect(tipoConfig.calcularPuntuacion(), equals(25));
+      expect(tipoConfig.puntuaciones[1], equals(4));
     });
 
     test('Muestra la info correcta', () {
-      final tipoConfig = Tipo(
-        tipo: TipoZona.azul,
-        color: 'Azul',
-        regla: 'Todos iguales',
-        puntuacion: 15,
-      );
+      final tipoConfig = TipoAzul();
 
-      final info = tipoConfig.obtenerInformacion();
-      expect(info, contains('Azul'));
-      expect(info, contains('15'));
-      expect(info, contains('Todos iguales'));
+      expect(tipoConfig.descripcion, equals('Todos los números deben de ser iguales'));
     });
   });
 }

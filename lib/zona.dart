@@ -55,24 +55,16 @@ class Zona {
     );
   }
 
+  bool validarNuevoMovimiento(int posible) {
+    return tipo.esPosibleAgregar(obtenerValores(), posible);
+  }
+
   bool verificarCompletado() {
     if (coordenadas.any((coordenada) => coordenada.valor == null)) {
       completado = false;
       return false;
     }
-
-    final valores = obtenerValores();
-
-    if (!tipo.validarMovimiento(valores)) {
-      completado = false;
-      return false;
-    }
-
     completado = true;
     return true;
-  }
-
-  bool validarMovimiento() {
-    return tipo.validarMovimiento(obtenerValores());
   }
 }

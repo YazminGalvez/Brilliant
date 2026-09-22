@@ -1,62 +1,114 @@
-enum TipoZona {
-  azul,
-  rojo,
-  verde,
-  amarillo,
-  morado,
+// lib/tipo.dart
+
+class Color {
+  final int value;
+  const Color(this.value);
 }
 
-class Tipo {
-  final TipoZona tipo;
-  final String color;
-  final String regla;
-  final int puntuacion;
+abstract class Tipo {
+  Color get color;
+  String get descripcion;
+  bool esPosibleAgregar(List<int> actuales, int posible);
+  Map<int, int> get puntuaciones;
+}
 
-  Tipo({
-    required this.tipo,
-    required this.color,
-    required this.regla,
-    required this.puntuacion,
-  });
+class TipoAzul extends Tipo {
+  @override
+  Color get color => const Color(0xFF2196F3);
 
-  bool validarMovimiento(List<int> valores) {
-    switch (tipo) {
-      case TipoZona.azul:
-        if (valores.isEmpty) {
-          return true;
-        }
-        return valores.every((numero) => numero == valores.first);
+  @override
+  String get descripcion => 'Todos los números deben de ser iguales';
 
-      case TipoZona.rojo:
-        return valores.toSet().length == valores.length;
-
-      case TipoZona.verde:
-        return true;
-
-      case TipoZona.amarillo:
-        return true;
-
-      case TipoZona.morado:
-        return valores.toSet().length <= 2;
-    }
+  @override
+  bool esPosibleAgregar(List<int> actuales, int posible) {
+    return actuales.isEmpty || actuales.every((element) => element == posible);
   }
 
-  bool validarAmarillo(List<int> valores) {
-    if (tipo != TipoZona.amarillo) {
-      return false;
-    }
-    return valores.toSet().length == valores.length;
+  @override
+  Map<int, int> get puntuaciones => {
+        1: 7,
+        2: 5,
+        3: 3,
+      };
+}
+
+class TipoRojo extends Tipo {
+  @override
+  Color get color => const Color(0xFFF44336);
+
+  @override
+  String get descripcion => 'Todos los números deben de ser distintos';
+
+  @override
+  bool esPosibleAgregar(List<int> actuales, int posible) {
+    return actuales.isEmpty || actuales.every((element) => element != posible);
   }
 
-  int calcularPuntuacion() {
-    return puntuacion;
+  @override
+  Map<int, int> get puntuaciones => {
+        1: 8,
+        2: 6,
+        3: 4,
+      };
+}
+
+class TipoVerde extends Tipo {
+  @override
+  Color get color => const Color(0xFF4CAF50);
+
+  @override
+  String get descripcion => 'Se puede colocar cualquier número';
+
+  @override
+  bool esPosibleAgregar(List<int> actuales, int posible) {
+    return true;
   }
 
-  String obtenerInformacion() {
-    return '''
-Tipo: $color
-Regla: $regla
-Puntuación: $puntuacion
-''';
+  @override
+  Map<int, int> get puntuaciones => {
+        1: 4,
+        2: 3,
+        3: 2,
+      };
+}
+
+class TipoMorado extends Tipo {
+  @override
+  Color get color => const Color(0xFF9C27B0);
+
+  @override
+  String get descripcion => 'Máximo dos números diferentes por zona';
+
+  @override
+  bool esPosibleAgregar(List<int> actuales, int posible) {
+    final distintos = actuales.toSet()..add(posible);
+    return distintos.length <= 2;
   }
+
+  @override
+  Map<int, int> get puntuaciones => {
+        1: 8,
+        2: 6,
+        3: 4,
+      };
+}
+
+class TipoAmarillo extends Tipo {
+  @override
+  Color get color => const Color(0xFFFFC107);
+
+  @override
+  String get descripcion => 'Todos los números deben de ser distintos';
+
+  @override
+  bool esPosibleAgregar(List<int> actuales, int posible) {
+    return actuales.isEmpty || actuales.every((element) => element != posible);
+  }
+
+  @override
+  Map<int, int> get puntuaciones => {
+        1: 8,
+        2: 6,
+        3: 4,
+      };
 }
