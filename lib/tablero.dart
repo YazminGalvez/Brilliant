@@ -5,6 +5,7 @@ class Tablero {
   static const int cantidadColumnas = 7;
 
   final List<List<Coordenada>> _matrizCeldas;
+  final List<Zona> _listaRegiones = [];
 
   Tablero()
       : _matrizCeldas = List.generate(
@@ -15,6 +16,7 @@ class Tablero {
           ),
         );
 
+  List<Zona> get regiones => List.unmodifiable(_listaRegiones);
   List<Coordenada> get celdas {
     final listaPlana = <Coordenada>[];
     for (var fila in _matrizCeldas) {
@@ -32,5 +34,40 @@ class Tablero {
 
   void colocarDato(int fila, int columna, int? valor) {
     obtenerCelda(fila, columna).valor = valor;
+  }
+
+  List<int?> extraerDatos() {
+    final datosExtraidos = <int?>[];
+    for (var f = 0; f < cantidadFilas; f++) {
+      for (var c = cantidadColumnas - 1; c >= 0; c--) {
+        datosExtraidos.add(_matrizCeldas[f][c].valor);
+      }
+    }
+    return datosExtraidos;
+  }
+
+  void agregarRegion(Zona region) {
+    for (var pos in region.coordenadas) {
+      if (pos.fila < 0 || pos.fila >= cantidadFilas || pos.columna < 0 || pos.columna >= cantidadColumnas) {
+        throw RangeError('Coordenada de región fuera de los límites.');
+      }
+    }
+
+    final idExistente = _listaRegiones.any((element) => element.id == region.id);
+    if (idExistente) {
+      throw ArgumentError('Ya existe una región con el id ${region.id}.');
+    }
+
+    _listaRegiones.add(region);
+  }
+
+  List<Coordenada> obtenerCeldasDeRegion(Zona region) {
+    if (!_listaRegiones.contains(region)) {
+      throw ArgumentError('La región no pertenece a este tablero.');
+    }
+
+    return region.coordenadas
+        .map((coord) => obtenerCelda(coord.fila, coord.columna))
+        .toList();
   }
 }
