@@ -10,7 +10,13 @@ class Coordenada {
     required this.columna,
     this.valor,
   });
+  Coordenada.xy(this.fila, this.columna, {this.valor});
+
+  int get x => fila;
+  int get y => columna;
+
 }
+
 
 class Zona {
   final int id;
