@@ -11,7 +11,7 @@ class Tablero {
           cantidadFilas,
           (f) => List.generate(
             cantidadColumnas,
-            (c) => Coordenada.xy(f, c),
+            (c) => Coordenada(fila: f, columna: c),
           ),
         );
 
@@ -21,5 +21,16 @@ class Tablero {
       listaPlana.addAll(fila);
     }
     return listaPlana;
+  }
+
+  Coordenada obtenerCelda(int fila, int columna) {
+    if (fila < 0 || fila >= cantidadFilas || columna < 0 || columna >= cantidadColumnas) {
+      throw RangeError('Coordenada fuera de los límites del tablero.');
+    }
+    return _matrizCeldas[fila][columna];
+  }
+
+  void colocarDato(int fila, int columna, int? valor) {
+    obtenerCelda(fila, columna).valor = valor;
   }
 }
