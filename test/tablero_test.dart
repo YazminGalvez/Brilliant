@@ -35,7 +35,13 @@ void main() {
     });
     test('Extrae en orden de derecha a izquierda y arriba hacia abajo', () {
       final tablero = Tablero();
+      final region = Zona(
+        id: 1,
+        tipo: crearTipoVerde(),
+        coordenadas: [tablero.obtenerCelda(0, 0)],
+      );
 
+      tablero.establecerValoresIniciales([region]);
       tablero.colocarDato(0, 6, 1);
       tablero.colocarDato(0, 5, 2);
       tablero.colocarDato(1, 6, 3);
@@ -45,6 +51,15 @@ void main() {
       expect(resultado[0], equals(1));
       expect(resultado[1], equals(2));
       expect(resultado[7], equals(3));
+    });
+
+    test('Bloquea la extracción si no se han proporcionado los valores iniciales', () {
+      final tablero = Tablero();
+
+      expect(
+        () => tablero.extraerDatos(),
+        throwsA(isA<StateError>()),
+      );
     });
 
     test('Permite guardar una región sin asignarla a cada celda individualmente', () {

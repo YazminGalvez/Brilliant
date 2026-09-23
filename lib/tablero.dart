@@ -6,6 +6,7 @@ class Tablero {
 
   final List<List<Coordenada>> _matrizCeldas;
   final List<Zona> _listaRegiones = [];
+  bool _valoresInicialesListos = false;
 
   Tablero()
       : _matrizCeldas = List.generate(
@@ -36,7 +37,18 @@ class Tablero {
     obtenerCelda(fila, columna).valor = valor;
   }
 
+  void establecerValoresIniciales(List<Zona> regionesIniciales) {
+    for (var region in regionesIniciales) {
+      agregarRegion(region);
+    }
+    _valoresInicialesListos = true;
+  }
+
   List<int?> extraerDatos() {
+    if (!_valoresInicialesListos) {
+      throw StateError('Bloqueo activo: No se puede avanzar hasta proporcionar los valores iniciales.');
+    }
+
     final datosExtraidos = <int?>[];
     for (var f = 0; f < cantidadFilas; f++) {
       for (var c = cantidadColumnas - 1; c >= 0; c--) {
