@@ -1,9 +1,21 @@
 import 'package:test/test.dart';
 import 'package:juego_brilliant/tablero.dart';
 import 'package:juego_brilliant/tipo.dart';
+import 'package:juego_brilliant/validador_inicio.dart';
 import 'package:juego_brilliant/zona.dart';
 
 void main() {
+  group('Validador de inicio', () {
+    test('Bloquea el avance hasta configurar los valores iniciales', () {
+      final validador = ValidadorInicio();
+
+      expect(validador.validarAvance, throwsA(isA<StateError>()));
+
+      validador.marcarValoresInicialesConfigurados();
+      expect(validador.validarAvance, returnsNormally);
+    });
+  });
+
   Tipo crearTipoVerde() {
     return TipoVerde();
   }
@@ -15,6 +27,7 @@ void main() {
       expect(Tablero.cantidadColumnas, equals(7));
       expect(tablero.celdas, hasLength(49));
     });
+
     test('Guarda y lee correctamente un dato en las celdas', () {
       final tablero = Tablero();
 

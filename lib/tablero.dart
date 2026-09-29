@@ -1,4 +1,5 @@
 import 'zona.dart';
+import 'validador_inicio.dart';
 
 class Tablero {
   static const int cantidadFilas = 7;
@@ -6,10 +7,11 @@ class Tablero {
 
   final List<List<Coordenada>> _matrizCeldas;
   final List<Zona> _listaRegiones = [];
-  bool _valoresInicialesListos = false;
+  final ValidadorInicio _validadorInicio;
 
-  Tablero()
-      : _matrizCeldas = List.generate(
+  Tablero({ValidadorInicio? validadorInicio})
+      : _validadorInicio = validadorInicio ?? ValidadorInicio(),
+        _matrizCeldas = List.generate(
           cantidadFilas,
           (f) => List.generate(
             cantidadColumnas,
@@ -41,13 +43,11 @@ class Tablero {
     for (var region in regionesIniciales) {
       agregarRegion(region);
     }
-    _valoresInicialesListos = true;
+    _validadorInicio.marcarValoresInicialesConfigurados();
   }
 
   List<int?> extraerDatos() {
-    if (!_valoresInicialesListos) {
-      throw StateError('Bloqueo activo: No se puede avanzar hasta proporcionar los valores iniciales.');
-    }
+    _validadorInicio.validarAvance();
 
     final datosExtraidos = <int?>[];
     for (var f = 0; f < cantidadFilas; f++) {
