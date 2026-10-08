@@ -105,22 +105,45 @@ class TableroPage extends StatefulWidget {
 }
 
 class _TableroPageState extends State<TableroPage> {
+  static const List<(int, int)> _celdasIniciales = [
+    (1, 3),
+    (2, 6),
+    (4, 2),
+    (4, 5),
+    (6, 3),
+    (7, 5),
+  ];
   final Map<(int, int), int> _valores = {};
 
   Future<void> _editarCelda(int fila, int columna) async {
     final coordenada = (fila + 1, columna + 1);
+    final esCeldaInicial = _celdasIniciales.contains(coordenada);
+
+    if (!esCeldaInicial) return;
+
+    final valorActual = _valores[coordenada];
+    final numerosDisponibles = {
+      for (final entrada in _valores.entries)
+        if (_celdasIniciales.contains(entrada.key) && entrada.key != coordenada)
+          entrada.value,
+    };
 
     final valor = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text('Fila ${fila + 1}, columna ${columna + 1}'),
+        title: Text(
+          esCeldaInicial
+              ? 'Número inicial ${_celdasIniciales.indexOf(coordenada) + 1}'
+              : 'Fila ${fila + 1}, columna ${columna + 1}',
+        ),
         children: [
           for (var numero = 1; numero <= 6; numero++)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, numero),
-              child: Text('$numero'),
-            ),
-          if (_valores.containsKey(coordenada))
+            if (!numerosDisponibles.contains(numero) || numero == valorActual)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, numero),
+                child: Text('$numero'),
+              ),
+          if (valorActual != null)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, 0),
               child: const Text('Vaciar celda'),
@@ -194,7 +217,7 @@ class _TableroPageState extends State<TableroPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Tablero 7 x 7',
+                    'Ingresa los números iniciales del 1 al 6',
                     style: TextStyle(
                       fontSize: 15,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -219,6 +242,9 @@ class _TableroPageState extends State<TableroPage> {
                             final color = mapaColores[fila][columna];
                             final coordenada = (fila + 1, columna + 1);
                             final valor = _valores[coordenada];
+                            final esCeldaInicial = _celdasIniciales.contains(
+                              coordenada,
+                            );
 
                             return Padding(
                               padding: const EdgeInsets.all(2),
@@ -228,23 +254,36 @@ class _TableroPageState extends State<TableroPage> {
                                 clipBehavior: Clip.antiAlias,
                                 child: InkWell(
                                   key: Key('cell-${fila + 1}-${columna + 1}'),
-                                  onTap: () => _editarCelda(fila, columna),
+                                  onTap: esCeldaInicial
+                                      ? () => _editarCelda(fila, columna)
+                                      : null,
                                   child: Container(
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: const Color(0x663D5147),
-                                        width: 0.7,
+                                        color: esCeldaInicial
+                                            ? const Color(0xFF2563EB)
+                                            : const Color(0x663D5147),
+                                        width: esCeldaInicial ? 2 : 0.7,
                                       ),
                                     ),
                                     alignment: Alignment.center,
                                     child: valor == null
-                                        ? null
+                                        ? esCeldaInicial
+                                              ? const Text(
+                                                  '+',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF1D4ED8),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                )
+                                              : null
                                         : Text(
                                             '$valor',
                                             style: TextStyle(
                                               color: const Color(0xFF26332D),
                                               fontSize: 18,
-                                                fontWeight: FontWeight.w600,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                   ),
