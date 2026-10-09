@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:juego_brilliant/validador_inicio.dart';
 
 enum ColorZonaBrilliant { amarillo, verde, azul, morado, rojo }
 
@@ -105,35 +106,45 @@ class TableroPage extends StatefulWidget {
 }
 
 class _TableroPageState extends State<TableroPage> {
-  static const List<(int, int)> _celdasIniciales = [
-    (1, 3),
-    (2, 6),
-    (4, 2),
-    (4, 5),
-    (6, 3),
-    (7, 5),
-  ];
+  final ValidadorInicio _validadorInicio = ValidadorInicio();
   final Map<(int, int), int> _valores = {};
+
+  List<int?> get _valoresIniciales => [
+    for (final coordenada in ValidadorInicio.celdasIniciales)
+      _valores[coordenada],
+  ];
+
+  void _actualizarEstadoInicial() {
+    _validadorInicio.actualizarValoresIniciales(_valoresIniciales);
+  }
+
+  void _iniciarPartida() {
+    if (!_validadorInicio.puedeIniciar) return;
+    setState(_validadorInicio.iniciarPartida);
+  }
 
   Future<void> _editarCelda(int fila, int columna) async {
     final coordenada = (fila + 1, columna + 1);
-    final esCeldaInicial = _celdasIniciales.contains(coordenada);
+    final esCeldaInicial = ValidadorInicio.celdasIniciales.contains(coordenada);
 
-    if (!esCeldaInicial) return;
+    if (_validadorInicio.jugando == esCeldaInicial) return;
 
     final valorActual = _valores[coordenada];
-    final numerosDisponibles = {
-      for (final entrada in _valores.entries)
-        if (_celdasIniciales.contains(entrada.key) && entrada.key != coordenada)
-          entrada.value,
-    };
+    final numerosDisponibles = esCeldaInicial
+        ? {
+            for (final entrada in _valores.entries)
+              if (ValidadorInicio.celdasIniciales.contains(entrada.key) &&
+                  entrada.key != coordenada)
+                entrada.value,
+          }
+        : <int>{};
 
     final valor = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text(
           esCeldaInicial
-              ? 'Número inicial ${_celdasIniciales.indexOf(coordenada) + 1}'
+              ? 'Número inicial ${ValidadorInicio.celdasIniciales.indexOf(coordenada) + 1}'
               : 'Fila ${fila + 1}, columna ${columna + 1}',
         ),
         children: [
@@ -155,7 +166,10 @@ class _TableroPageState extends State<TableroPage> {
     if (valor == null || !mounted) return;
 
     if (valor == 0) {
-      setState(() => _valores.remove(coordenada));
+      setState(() {
+        _valores.remove(coordenada);
+        if (esCeldaInicial) _actualizarEstadoInicial();
+      });
       return;
     }
 
@@ -188,7 +202,10 @@ class _TableroPageState extends State<TableroPage> {
       return;
     }
 
-    setState(() => _valores[coordenada] = valor);
+    setState(() {
+      _valores[coordenada] = valor;
+      if (esCeldaInicial) _actualizarEstadoInicial();
+    });
   }
 
   Color _colorDeZona(ColorZonaBrilliant color) => switch (color) {
@@ -217,7 +234,9 @@ class _TableroPageState extends State<TableroPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Ingresa los números iniciales del 1 al 6',
+                    _validadorInicio.jugando
+                        ? 'Partida en curso'
+                        : 'Ingresa los números iniciales del 1 al 6',
                     style: TextStyle(
                       fontSize: 15,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -242,9 +261,9 @@ class _TableroPageState extends State<TableroPage> {
                             final color = mapaColores[fila][columna];
                             final coordenada = (fila + 1, columna + 1);
                             final valor = _valores[coordenada];
-                            final esCeldaInicial = _celdasIniciales.contains(
-                              coordenada,
-                            );
+                            final esCeldaInicial = ValidadorInicio
+                                .celdasIniciales
+                                .contains(coordenada);
 
                             return Padding(
                               padding: const EdgeInsets.all(2),
@@ -254,7 +273,11 @@ class _TableroPageState extends State<TableroPage> {
                                 clipBehavior: Clip.antiAlias,
                                 child: InkWell(
                                   key: Key('cell-${fila + 1}-${columna + 1}'),
-                                  onTap: esCeldaInicial
+                                  onTap: _validadorInicio.jugando
+                                      ? esCeldaInicial
+                                            ? null
+                                            : () => _editarCelda(fila, columna)
+                                      : esCeldaInicial
                                       ? () => _editarCelda(fila, columna)
                                       : null,
                                   child: Container(
@@ -295,6 +318,26 @@ class _TableroPageState extends State<TableroPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  if (!_validadorInicio.jugando) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        key: const Key('start-game'),
+                        onPressed: _validadorInicio.puedeIniciar
+                            ? _iniciarPartida
+                            : null,
+                        child: const Text('Inicio'),
+                      ),
+                    ),
+                    if (!_validadorInicio.puedeIniciar)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Faltan números iniciales: ingresa del 1 al 6 sin repetir.',
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),

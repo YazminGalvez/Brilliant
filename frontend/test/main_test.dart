@@ -77,4 +77,40 @@ void main() {
 
     expect(find.text('+'), findsNWidgets(coordenadasIniciales.length));
   });
+
+  testWidgets(
+    'Inicio se habilita al completar los valores y cambia a jugando',
+    (tester) async {
+      await tester.pumpWidget(const MainApp());
+
+      FilledButton botonInicio() =>
+          tester.widget<FilledButton>(find.byKey(const Key('start-game')));
+
+      expect(botonInicio().onPressed, isNull);
+      expect(
+        find.text('Faltan números iniciales: ingresa del 1 al 6 sin repetir.'),
+        findsOneWidget,
+      );
+
+      for (var index = 0; index < coordenadasIniciales.length; index++) {
+        await ingresarNumero(tester, coordenadasIniciales[index], index + 1);
+      }
+
+      expect(botonInicio().onPressed, isNotNull);
+      await tester.ensureVisible(find.byKey(const Key('start-game')));
+      await tester.tap(find.byKey(const Key('start-game')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Partida en curso'), findsOneWidget);
+      expect(find.byKey(const Key('start-game')), findsNothing);
+      expect(
+        tester.widget<InkWell>(find.byKey(const Key('cell-1-1'))).onTap,
+        isNotNull,
+      );
+      expect(
+        tester.widget<InkWell>(find.byKey(const Key('cell-1-3'))).onTap,
+        isNull,
+      );
+    },
+  );
 }
