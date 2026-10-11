@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:juego_brilliant/validador_inicio.dart';
+import 'package:frontend/lanzamiento_dados.dart';
 
 enum ColorZonaBrilliant { amarillo, verde, azul, morado, rojo }
 
@@ -319,6 +320,8 @@ class _TableroPageState extends State<TableroPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  if (_validadorInicio.jugando)
+                    const Center(child: LanzamientoDados()),
                   if (!_validadorInicio.jugando) ...[
                     SizedBox(
                       width: double.infinity,

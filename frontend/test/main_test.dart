@@ -103,6 +103,7 @@ void main() {
 
       expect(find.text('Partida en curso'), findsOneWidget);
       expect(find.byKey(const Key('start-game')), findsNothing);
+      expect(find.byKey(const Key('roll-dice-button')), findsOneWidget);
       expect(
         tester.widget<InkWell>(find.byKey(const Key('cell-1-1'))).onTap,
         isNotNull,
