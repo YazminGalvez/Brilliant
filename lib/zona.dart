@@ -45,6 +45,16 @@ class Zona {
   void colocarNumero(int fila, int columna, int numero) {
     for (var coordenada in coordenadas) {
       if (coordenada.fila == fila && coordenada.columna == columna) {
+        final valoresDeOtrasCeldas = coordenadas
+            .where(
+              (actual) =>
+                  actual != coordenada && actual.valor != null,
+            )
+            .map((actual) => actual.valor!)
+            .toList();
+        if (!tipo.esPosibleAgregar(valoresDeOtrasCeldas, numero)) {
+          throw StateError('Movimiento inválido: ${tipo.descripcion}.');
+        }
         coordenada.valor = numero;
         return;
       }

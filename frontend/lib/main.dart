@@ -70,6 +70,59 @@ const List<List<ColorZonaBrilliant>> mapaColores = [
   ],
 ];
 
+final List<List<int>> _mapaIdsZonas = _crearMapaIdsZonas();
+
+List<List<int>> _crearMapaIdsZonas() {
+  final ids = List.generate(7, (_) => List.filled(7, -1));
+  var siguienteId = 0;
+
+  for (var fila = 0; fila < 7; fila++) {
+    for (var columna = 0; columna < 7; columna++) {
+      if (ids[fila][columna] != -1) continue;
+
+      final color = mapaColores[fila][columna];
+      final pendientes = <(int, int)>[(fila, columna)];
+      ids[fila][columna] = siguienteId;
+
+      while (pendientes.isNotEmpty) {
+        final (filaActual, columnaActual) = pendientes.removeLast();
+        for (final (deltaFila, deltaColumna) in [
+          (-1, 0),
+          (1, 0),
+          (0, -1),
+          (0, 1),
+        ]) {
+          final filaVecina = filaActual + deltaFila;
+          final columnaVecina = columnaActual + deltaColumna;
+          if (filaVecina < 0 ||
+              filaVecina >= 7 ||
+              columnaVecina < 0 ||
+              columnaVecina >= 7 ||
+              ids[filaVecina][columnaVecina] != -1 ||
+              mapaColores[filaVecina][columnaVecina] != color) {
+            continue;
+          }
+
+          ids[filaVecina][columnaVecina] = siguienteId;
+          pendientes.add((filaVecina, columnaVecina));
+        }
+      }
+      siguienteId++;
+    }
+  }
+
+  final idZonaAmarilla = ids[0][0];
+  for (var fila = 0; fila < 7; fila++) {
+    for (var columna = 0; columna < 7; columna++) {
+      if (mapaColores[fila][columna] == ColorZonaBrilliant.amarillo) {
+        ids[fila][columna] = idZonaAmarilla;
+      }
+    }
+  }
+
+  return ids;
+}
+
 String descripcionRegla(ColorZonaBrilliant color) => switch (color) {
   ColorZonaBrilliant.amarillo => 'Todos los números deben ser distintos',
   ColorZonaBrilliant.verde => 'Se puede colocar cualquier número',
@@ -175,6 +228,7 @@ class _TableroPageState extends State<TableroPage> {
     }
 
     final color = mapaColores[fila][columna];
+    final idZona = _mapaIdsZonas[fila][columna];
     final valoresZona = <int>[
       for (var filaZona = 0; filaZona < mapaColores.length; filaZona++)
         for (
@@ -182,7 +236,7 @@ class _TableroPageState extends State<TableroPage> {
           columnaZona < mapaColores[filaZona].length;
           columnaZona++
         )
-          if (mapaColores[filaZona][columnaZona] == color &&
+          if (_mapaIdsZonas[filaZona][columnaZona] == idZona &&
               (filaZona != fila || columnaZona != columna) &&
               _valores.containsKey((filaZona + 1, columnaZona + 1)))
             _valores[(filaZona + 1, columnaZona + 1)]!,
