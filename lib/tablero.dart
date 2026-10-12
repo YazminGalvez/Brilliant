@@ -10,16 +10,21 @@ class Tablero {
   final ValidadorInicio _validadorInicio;
 
   Tablero({ValidadorInicio? validadorInicio})
-      : _validadorInicio = validadorInicio ?? ValidadorInicio(),
-        _matrizCeldas = List.generate(
-          cantidadFilas,
-          (f) => List.generate(
-            cantidadColumnas,
-            (c) => Coordenada(fila: f, columna: c),
-          ),
-        );
+    : _validadorInicio = validadorInicio ?? ValidadorInicio(),
+      _matrizCeldas = List.generate(
+        cantidadFilas,
+        (f) => List.generate(
+          cantidadColumnas,
+          (c) => Coordenada(fila: f, columna: c),
+        ),
+      );
 
   List<Zona> get regiones => List.unmodifiable(_listaRegiones);
+  Set<int> get valoresColocados => {
+    for (final celda in celdas)
+      if (celda.valor != null) celda.valor!,
+  };
+
   List<Coordenada> get celdas {
     final listaPlana = <Coordenada>[];
     for (var fila in _matrizCeldas) {
@@ -29,7 +34,10 @@ class Tablero {
   }
 
   Coordenada obtenerCelda(int fila, int columna) {
-    if (fila < 0 || fila >= cantidadFilas || columna < 0 || columna >= cantidadColumnas) {
+    if (fila < 0 ||
+        fila >= cantidadFilas ||
+        columna < 0 ||
+        columna >= cantidadColumnas) {
       throw RangeError('Coordenada fuera de los límites del tablero.');
     }
     return _matrizCeldas[fila][columna];
@@ -60,12 +68,17 @@ class Tablero {
 
   void agregarRegion(Zona region) {
     for (var pos in region.coordenadas) {
-      if (pos.fila < 0 || pos.fila >= cantidadFilas || pos.columna < 0 || pos.columna >= cantidadColumnas) {
+      if (pos.fila < 0 ||
+          pos.fila >= cantidadFilas ||
+          pos.columna < 0 ||
+          pos.columna >= cantidadColumnas) {
         throw RangeError('Coordenada de región fuera de los límites.');
       }
     }
 
-    final idExistente = _listaRegiones.any((element) => element.id == region.id);
+    final idExistente = _listaRegiones.any(
+      (element) => element.id == region.id,
+    );
     if (idExistente) {
       throw ArgumentError('Ya existe una región con el id ${region.id}.');
     }
