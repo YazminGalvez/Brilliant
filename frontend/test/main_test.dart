@@ -118,6 +118,49 @@ void main() {
     },
   );
 
+  testWidgets(
+    'muestra el historial a la derecha del tablero en pantalla amplia',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const MainApp());
+
+      for (var index = 0; index < coordenadasIniciales.length; index++) {
+        await ingresarNumero(tester, coordenadasIniciales[index], index + 1);
+      }
+
+      final inicio = find.byKey(const Key('start-game'));
+      await tester.ensureVisible(inicio);
+      await tester.tap(inicio);
+      await tester.pumpAndSettle();
+
+      final tableroDerecho = tester
+          .getRect(find.byKey(const Key('cell-1-7')))
+          .right;
+      final historialIzquierdo = tester
+          .getRect(find.byKey(const Key('dice-roll-history-panel')))
+          .left;
+      final tableroInferior = tester
+          .getRect(find.byKey(const Key('cell-7-1')))
+          .bottom;
+      final dadosSuperior = tester
+          .getRect(find.byKey(const Key('roll-dice-button')))
+          .top;
+
+      expect(historialIzquierdo, greaterThan(tableroDerecho));
+      expect(dadosSuperior, greaterThanOrEqualTo(tableroInferior));
+
+      final botonLanzar = find.byKey(const Key('roll-dice-button'));
+      await tester.ensureVisible(botonLanzar);
+      await tester.tap(botonLanzar);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Tirada 1:'), findsOneWidget);
+    },
+  );
+
   testWidgets('seleccionar ancla marca y permite colocar en destinos válidos', (
     tester,
   ) async {

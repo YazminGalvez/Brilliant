@@ -1,12 +1,14 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:juego_brilliant/historial_lanzamientos.dart';
 import 'package:juego_brilliant/tablero.dart';
 import 'package:juego_brilliant/tipo.dart' as modelo;
 import 'package:juego_brilliant/validador_anclas.dart';
 import 'package:juego_brilliant/validador_inicio.dart';
 import 'package:juego_brilliant/zona.dart';
 import 'package:frontend/lanzamiento_dados.dart';
+import 'package:frontend/panel_historial_lanzamientos.dart';
 
 enum ColorZonaBrilliant { amarillo, verde, azul, morado, rojo }
 
@@ -169,6 +171,8 @@ class TableroPage extends StatefulWidget {
 
 class _TableroPageState extends State<TableroPage> {
   final ValidadorInicio _validadorInicio = ValidadorInicio();
+  final HistorialLanzamientos _historialLanzamientos =
+      HistorialLanzamientos();
   final Map<(int, int), int> _valores = {};
   final Map<int, int> _puntajesPorZona = {};
   final Set<int> _zonasPuntuadas = {};
@@ -422,7 +426,7 @@ class _TableroPageState extends State<TableroPage> {
           padding: const EdgeInsets.all(20),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
+              constraints: const BoxConstraints(maxWidth: 1120),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -445,118 +449,171 @@ class _TableroPageState extends State<TableroPage> {
                     _construirMarcador(),
                   ],
                   const SizedBox(height: 20),
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 560),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: GridView.builder(
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: 49,
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 7,
-                              ),
-                          itemBuilder: (context, index) {
-                            final fila = index ~/ 7;
-                            final columna = index % 7;
-                            final color = mapaColores[fila][columna];
-                            final coordenada = (fila + 1, columna + 1);
-                            final valor = _valores[coordenada];
-                            final esDestinoValido = _destinosValidos.contains((
-                              fila,
-                              columna,
-                            ));
-                            final esCeldaInicial = ValidadorInicio
-                                .celdasIniciales
-                                .contains(coordenada);
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final tablero = Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 560),
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: GridView.builder(
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: 49,
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 7,
+                                  ),
+                              itemBuilder: (context, index) {
+                                final fila = index ~/ 7;
+                                final columna = index % 7;
+                                final color = mapaColores[fila][columna];
+                                final coordenada = (fila + 1, columna + 1);
+                                final valor = _valores[coordenada];
+                                final esDestinoValido = _destinosValidos
+                                    .contains((fila, columna));
+                                final esCeldaInicial = ValidadorInicio
+                                    .celdasIniciales
+                                    .contains(coordenada);
 
-                            return Padding(
-                              padding: const EdgeInsets.all(2),
-                              child: Material(
-                                color: esDestinoValido
-                                    ? const Color(0xFFBBF7D0)
-                                    : _colorDeZona(color),
-                                borderRadius: BorderRadius.circular(4),
-                                clipBehavior: Clip.antiAlias,
-                                child: InkWell(
-                                  key: Key('cell-${fila + 1}-${columna + 1}'),
-                                  onTap: _validadorInicio.jugando
-                                      ? esCeldaInicial
-                                            ? null
-                                            : () => _editarCelda(fila, columna)
-                                      : esCeldaInicial
-                                      ? () => _editarCelda(fila, columna)
-                                      : null,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: esDestinoValido
-                                            ? const Color(0xFF16A34A)
-                                            : esCeldaInicial
-                                            ? const Color(0xFF2563EB)
-                                            : const Color(0x663D5147),
-                                        width: esDestinoValido
-                                            ? 3
-                                            : esCeldaInicial
-                                            ? 2
-                                            : 0.7,
+                                return Padding(
+                                  padding: const EdgeInsets.all(2),
+                                  child: Material(
+                                    color: esDestinoValido
+                                        ? const Color(0xFFBBF7D0)
+                                        : _colorDeZona(color),
+                                    borderRadius: BorderRadius.circular(4),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: InkWell(
+                                      key: Key(
+                                        'cell-${fila + 1}-${columna + 1}',
+                                      ),
+                                      onTap: _validadorInicio.jugando
+                                          ? esCeldaInicial
+                                                ? null
+                                                : () => _editarCelda(
+                                                    fila,
+                                                    columna,
+                                                  )
+                                          : esCeldaInicial
+                                          ? () => _editarCelda(fila, columna)
+                                          : null,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: esDestinoValido
+                                                ? const Color(0xFF16A34A)
+                                                : esCeldaInicial
+                                                ? const Color(0xFF2563EB)
+                                                : const Color(0x663D5147),
+                                            width: esDestinoValido
+                                                ? 3
+                                                : esCeldaInicial
+                                                ? 2
+                                                : 0.7,
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        key: esDestinoValido
+                                            ? Key(
+                                                'valid-move-cell-${fila + 1}-${columna + 1}',
+                                              )
+                                            : null,
+                                        child: valor == null
+                                            ? esDestinoValido
+                                                  ? Icon(
+                                                      Icons.add_circle,
+                                                      key: Key(
+                                                        'valid-move-marker-${fila + 1}-${columna + 1}',
+                                                      ),
+                                                      color: const Color(
+                                                        0xFF15803D,
+                                                      ),
+                                                      size: 16,
+                                                    )
+                                                  : esCeldaInicial
+                                                  ? const Text(
+                                                      '+',
+                                                      style: TextStyle(
+                                                        color: Color(
+                                                          0xFF1D4ED8,
+                                                        ),
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    )
+                                                  : null
+                                            : Text(
+                                                '$valor',
+                                                style: TextStyle(
+                                                  color: const Color(
+                                                    0xFF26332D,
+                                                  ),
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
                                       ),
                                     ),
-                                    alignment: Alignment.center,
-                                    key: esDestinoValido
-                                        ? Key(
-                                            'valid-move-cell-${fila + 1}-${columna + 1}',
-                                          )
-                                        : null,
-                                    child: valor == null
-                                        ? esDestinoValido
-                                              ? Icon(
-                                                  Icons.add_circle,
-                                                  key: Key(
-                                                    'valid-move-marker-${fila + 1}-${columna + 1}',
-                                                  ),
-                                                  color: const Color(
-                                                    0xFF15803D,
-                                                  ),
-                                                  size: 16,
-                                                )
-                                              : esCeldaInicial
-                                              ? const Text(
-                                                  '+',
-                                                  style: TextStyle(
-                                                    color: Color(0xFF1D4ED8),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                )
-                                              : null
-                                        : Text(
-                                            '$valor',
-                                            style: TextStyle(
-                                              color: const Color(0xFF26332D),
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
                                   ),
-                                ),
-                              ),
-                            );
-                          },
+                                );
+                              },
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                      final panelDados = _validadorInicio.jugando
+                          ? LanzamientoDados(
+                              valoresPresentes: _valores.values.toSet(),
+                              opcionSeleccionada: _opcionAnclaSeleccionada,
+                              tiradaConsumida: _tiradaConsumida,
+                              onAnclaSeleccionada: _seleccionarOpcionAncla,
+                              onTirada: _registrarTirada,
+                              random: widget.random,
+                            )
+                          : null;
+                      final panelHistorial = _validadorInicio.jugando
+                          ? PanelHistorialLanzamientos(
+                              historial: _historialLanzamientos,
+                            )
+                          : null;
+
+                      if (panelDados != null &&
+                          panelHistorial != null &&
+                          constraints.maxWidth >= 850) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  tablero,
+                                  const SizedBox(height: 16),
+                                  panelDados,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            SizedBox(width: 300, child: panelHistorial),
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          tablero,
+                          if (panelDados != null) ...[
+                            const SizedBox(height: 16),
+                            panelDados,
+                          ],
+                          if (panelHistorial != null) ...[
+                            const SizedBox(height: 16),
+                            panelHistorial,
+                          ],
+                        ],
+                      );
+                    },
                   ),
-                  const SizedBox(height: 16),
-                  if (_validadorInicio.jugando)
-                    LanzamientoDados(
-                      valoresPresentes: _valores.values.toSet(),
-                      opcionSeleccionada: _opcionAnclaSeleccionada,
-                      tiradaConsumida: _tiradaConsumida,
-                      onAnclaSeleccionada: _seleccionarOpcionAncla,
-                      random: widget.random,
-                    ),
                   if (!_validadorInicio.jugando) ...[
                     SizedBox(
                       width: double.infinity,
@@ -583,6 +640,12 @@ class _TableroPageState extends State<TableroPage> {
         ),
       ),
     );
+  }
+
+  void _registrarTirada(List<int> valores) {
+    setState(() {
+      _historialLanzamientos.registrar(valores);
+    });
   }
 
   Widget _construirMarcador() {

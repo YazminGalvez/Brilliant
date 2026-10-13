@@ -10,6 +10,7 @@ class LanzamientoDados extends StatefulWidget {
     this.tiradaConsumida = false,
     this.opcionSeleccionada,
     this.onAnclaSeleccionada,
+    this.onTirada,
     this.random,
     super.key,
   });
@@ -18,6 +19,7 @@ class LanzamientoDados extends StatefulWidget {
   final bool tiradaConsumida;
   final OpcionAncla? opcionSeleccionada;
   final ValueChanged<OpcionAncla?>? onAnclaSeleccionada;
+  final ValueChanged<List<int>>? onTirada;
   final Random? random;
 
   @override
@@ -56,12 +58,24 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
 
   List<int?> _resultados = [null, null];
 
+  @override
+  void initState() {
+    super.initState();
+    _controlador.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() {});
+      }
+    });
+  }
+
   void _lanzarDados() {
     if (_controlador.isAnimating) return;
 
+    final resultados = _dados.lanzar();
+    widget.onTirada?.call(resultados);
     widget.onAnclaSeleccionada?.call(null);
     setState(() {
-      _resultados = _dados.lanzar();
+      _resultados = resultados;
     });
     _controlador.forward(from: 0);
   }
@@ -138,7 +152,7 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 for (var index = 0; index < _resultados.length; index++) ...[
-                  if (index > 0) const SizedBox(width: 24),
+                  if (index > 0) const SizedBox(width: 8),
                   Semantics(
                     label:
                         'Dado ${index + 1}: ${_resultados[index] ?? "sin lanzar"}',
