@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/main.dart';
@@ -114,4 +116,79 @@ void main() {
       );
     },
   );
+
+  testWidgets('seleccionar ancla marca y permite colocar en destinos válidos', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MaterialApp(home: TableroPage(random: Random(42))));
+
+    for (var index = 0; index < coordenadasIniciales.length; index++) {
+      await ingresarNumero(tester, coordenadasIniciales[index], index + 1);
+    }
+
+    final inicio = find.byKey(const Key('start-game'));
+    await tester.ensureVisible(inicio);
+    await tester.tap(inicio);
+    await tester.pumpAndSettle();
+
+    final botonLanzar = find.byKey(const Key('roll-dice-button'));
+    await tester.ensureVisible(botonLanzar);
+    await tester.tap(botonLanzar);
+    await tester.pumpAndSettle();
+
+    final opciones = tester
+        .widgetList<OutlinedButton>(find.byType(OutlinedButton))
+        .where((opcion) => opcion.onPressed != null)
+        .map((opcion) => opcion.key! as ValueKey<String>)
+        .toList();
+    expect(opciones, isNotEmpty);
+
+    Finder marcadoresValidos() => find.byWidgetPredicate(
+      (widget) =>
+          widget is Icon &&
+          widget.key is ValueKey<String> &&
+          (widget.key! as ValueKey<String>).value.startsWith(
+            'valid-move-marker-',
+          ),
+    );
+
+    ValueKey<String>? opcionConDestino;
+    for (final opcion in opciones) {
+      final botonOpcion = find.byKey(opcion);
+      await tester.ensureVisible(botonOpcion);
+      await tester.tap(botonOpcion);
+      await tester.pumpAndSettle();
+      if (marcadoresValidos().evaluate().isNotEmpty) {
+        opcionConDestino = opcion;
+        break;
+      }
+    }
+
+    expect(opcionConDestino, isNotNull);
+    final marker = tester.widget<Icon>(marcadoresValidos().first);
+    final markerKey = marker.key! as ValueKey<String>;
+    final partesCoordenada = markerKey.value.split('-');
+    final fila = partesCoordenada[3];
+    final columna = partesCoordenada[4];
+    final celdaDestino = find.byKey(Key('cell-$fila-$columna'));
+    final textoOpcion = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(opcionConDestino!),
+        matching: find.byType(Text),
+      ),
+    );
+    final numeroAColocar = RegExp(
+      r'colocar (\d+)',
+    ).firstMatch(textoOpcion.data!)!.group(1)!;
+
+    await tester.ensureVisible(celdaDestino);
+    await tester.tap(celdaDestino);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: celdaDestino, matching: find.text(numeroAColocar)),
+      findsOneWidget,
+    );
+    expect(marcadoresValidos(), findsNothing);
+  });
 }

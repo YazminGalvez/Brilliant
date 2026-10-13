@@ -7,12 +7,16 @@ import 'package:juego_brilliant/validador_anclas.dart';
 class LanzamientoDados extends StatefulWidget {
   const LanzamientoDados({
     required this.valoresPresentes,
+    this.opcionSeleccionada,
     this.onAnclaSeleccionada,
+    this.random,
     super.key,
   });
 
   final Set<int> valoresPresentes;
-  final ValueChanged<OpcionAncla>? onAnclaSeleccionada;
+  final OpcionAncla? opcionSeleccionada;
+  final ValueChanged<OpcionAncla?>? onAnclaSeleccionada;
+  final Random? random;
 
   @override
   State<LanzamientoDados> createState() => _LanzamientoDadosState();
@@ -22,7 +26,7 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
     with SingleTickerProviderStateMixin {
   static const _duracionAnimacion = Duration(milliseconds: 900);
 
-  final Dados _dados = Dados(cantidad: 2);
+  late final Dados _dados = Dados(cantidad: 2, random: widget.random);
   late final AnimationController _controlador = AnimationController(
     vsync: this,
     duration: _duracionAnimacion,
@@ -49,39 +53,21 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
   ]).animate(_controlador);
 
   List<int?> _resultados = [null, null];
-  OpcionAncla? _opcionSeleccionada;
-
-  @override
-  void didUpdateWidget(covariant LanzamientoDados oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!_mismosValores(oldWidget.valoresPresentes, widget.valoresPresentes) &&
-        _opcionSeleccionada != null &&
-        !widget.valoresPresentes.contains(_opcionSeleccionada!.ancla)) {
-      _opcionSeleccionada = null;
-    }
-  }
 
   void _lanzarDados() {
     if (_controlador.isAnimating) return;
 
+    widget.onAnclaSeleccionada?.call(null);
     setState(() {
       _resultados = _dados.lanzar();
-      _opcionSeleccionada = null;
     });
     _controlador.forward(from: 0);
   }
 
   void _seleccionarOpcion(OpcionAncla opcion) {
     if (!opcion.puedeSeleccionarse) return;
-
-    setState(() {
-      _opcionSeleccionada = opcion;
-    });
     widget.onAnclaSeleccionada?.call(opcion);
   }
-
-  bool _mismosValores(Set<int> primero, Set<int> segundo) =>
-      primero.length == segundo.length && primero.containsAll(segundo);
 
   List<OpcionAncla> get _opcionesAncla {
     if (_resultados.any((resultado) => resultado == null)) return const [];
@@ -175,7 +161,7 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
             ? const SizedBox.shrink()
             : _PanelOpcionesAncla(
                 opciones: opciones,
-                seleccionada: _opcionSeleccionada,
+                seleccionada: widget.opcionSeleccionada,
                 onSeleccionar: _seleccionarOpcion,
               );
 

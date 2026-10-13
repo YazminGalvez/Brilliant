@@ -1,5 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:juego_brilliant/tablero.dart';
+import 'package:juego_brilliant/tipo.dart' as modelo;
+import 'package:juego_brilliant/validador_anclas.dart';
 import 'package:juego_brilliant/validador_inicio.dart';
+import 'package:juego_brilliant/zona.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 
 enum ColorZonaBrilliant { amarillo, verde, azul, morado, rojo }
@@ -153,7 +159,9 @@ class MainApp extends StatelessWidget {
 }
 
 class TableroPage extends StatefulWidget {
-  const TableroPage({super.key});
+  const TableroPage({this.random, super.key});
+
+  final Random? random;
 
   @override
   State<TableroPage> createState() => _TableroPageState();
@@ -162,6 +170,8 @@ class TableroPage extends StatefulWidget {
 class _TableroPageState extends State<TableroPage> {
   final ValidadorInicio _validadorInicio = ValidadorInicio();
   final Map<(int, int), int> _valores = {};
+  OpcionAncla? _opcionAnclaSeleccionada;
+  Set<(int, int)> _destinosValidos = {};
 
   List<int?> get _valoresIniciales => [
     for (final coordenada in ValidadorInicio.celdasIniciales)
@@ -177,7 +187,68 @@ class _TableroPageState extends State<TableroPage> {
     setState(_validadorInicio.iniciarPartida);
   }
 
+  Tablero _crearTableroParaValidarAnclas() {
+    final tablero = Tablero();
+    final coordenadasPorZona = <int, List<Coordenada>>{};
+
+    for (var fila = 0; fila < mapaColores.length; fila++) {
+      for (var columna = 0; columna < mapaColores[fila].length; columna++) {
+        tablero.colocarDato(fila, columna, _valores[(fila + 1, columna + 1)]);
+        coordenadasPorZona
+            .putIfAbsent(_mapaIdsZonas[fila][columna], () => [])
+            .add(tablero.obtenerCelda(fila, columna));
+      }
+    }
+
+    for (final entrada in coordenadasPorZona.entries) {
+      final primeraCelda = entrada.value.first;
+      final tipo =
+          switch (mapaColores[primeraCelda.fila][primeraCelda.columna]) {
+            ColorZonaBrilliant.amarillo => modelo.TipoAmarillo(),
+            ColorZonaBrilliant.verde => modelo.TipoVerde(),
+            ColorZonaBrilliant.azul => modelo.TipoAzul(),
+            ColorZonaBrilliant.morado => modelo.TipoMorado(),
+            ColorZonaBrilliant.rojo => modelo.TipoRojo(),
+          };
+      tablero.agregarRegion(
+        Zona(id: entrada.key, tipo: tipo, coordenadas: entrada.value),
+      );
+    }
+
+    return tablero;
+  }
+
+  void _seleccionarOpcionAncla(OpcionAncla? opcion) {
+    if (opcion == null || !opcion.puedeSeleccionarse) {
+      setState(() {
+        _opcionAnclaSeleccionada = null;
+        _destinosValidos = {};
+      });
+      return;
+    }
+
+    final validador = ValidadorAnclas(_crearTableroParaValidarAnclas());
+    final destinos = validador.buscarDestinosValidos(
+      numeroAncla: opcion.ancla,
+      numeroDelOtroDado: opcion.numeroAColocar,
+    );
+
+    setState(() {
+      _opcionAnclaSeleccionada = opcion;
+      _destinosValidos = {
+        for (final destino in destinos) (destino.fila, destino.columna),
+      };
+    });
+  }
+
   Future<void> _editarCelda(int fila, int columna) async {
+    final destino = (fila, columna);
+    if (_destinosValidos.contains(destino) &&
+        _opcionAnclaSeleccionada != null) {
+      _guardarNumero(fila, columna, _opcionAnclaSeleccionada!.numeroAColocar);
+      return;
+    }
+
     final coordenada = (fila + 1, columna + 1);
     final esCeldaInicial = ValidadorInicio.celdasIniciales.contains(coordenada);
 
@@ -223,10 +294,16 @@ class _TableroPageState extends State<TableroPage> {
       setState(() {
         _valores.remove(coordenada);
         if (esCeldaInicial) _actualizarEstadoInicial();
+        _opcionAnclaSeleccionada = null;
+        _destinosValidos = {};
       });
       return;
     }
 
+    _guardarNumero(fila, columna, valor);
+  }
+
+  void _guardarNumero(int fila, int columna, int valor) {
     final color = mapaColores[fila][columna];
     final idZona = _mapaIdsZonas[fila][columna];
     final valoresZona = <int>[
@@ -258,8 +335,12 @@ class _TableroPageState extends State<TableroPage> {
     }
 
     setState(() {
-      _valores[coordenada] = valor;
-      if (esCeldaInicial) _actualizarEstadoInicial();
+      _valores[(fila + 1, columna + 1)] = valor;
+      if (ValidadorInicio.celdasIniciales.contains((fila + 1, columna + 1))) {
+        _actualizarEstadoInicial();
+      }
+      _opcionAnclaSeleccionada = null;
+      _destinosValidos = {};
     });
   }
 
@@ -316,6 +397,10 @@ class _TableroPageState extends State<TableroPage> {
                             final color = mapaColores[fila][columna];
                             final coordenada = (fila + 1, columna + 1);
                             final valor = _valores[coordenada];
+                            final esDestinoValido = _destinosValidos.contains((
+                              fila,
+                              columna,
+                            ));
                             final esCeldaInicial = ValidadorInicio
                                 .celdasIniciales
                                 .contains(coordenada);
@@ -323,7 +408,9 @@ class _TableroPageState extends State<TableroPage> {
                             return Padding(
                               padding: const EdgeInsets.all(2),
                               child: Material(
-                                color: _colorDeZona(color),
+                                color: esDestinoValido
+                                    ? const Color(0xFFBBF7D0)
+                                    : _colorDeZona(color),
                                 borderRadius: BorderRadius.circular(4),
                                 clipBehavior: Clip.antiAlias,
                                 child: InkWell(
@@ -338,15 +425,37 @@ class _TableroPageState extends State<TableroPage> {
                                   child: Container(
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: esCeldaInicial
+                                        color: esDestinoValido
+                                            ? const Color(0xFF16A34A)
+                                            : esCeldaInicial
                                             ? const Color(0xFF2563EB)
                                             : const Color(0x663D5147),
-                                        width: esCeldaInicial ? 2 : 0.7,
+                                        width: esDestinoValido
+                                            ? 3
+                                            : esCeldaInicial
+                                            ? 2
+                                            : 0.7,
                                       ),
                                     ),
                                     alignment: Alignment.center,
+                                    key: esDestinoValido
+                                        ? Key(
+                                            'valid-move-cell-${fila + 1}-${columna + 1}',
+                                          )
+                                        : null,
                                     child: valor == null
-                                        ? esCeldaInicial
+                                        ? esDestinoValido
+                                              ? Icon(
+                                                  Icons.add_circle,
+                                                  key: Key(
+                                                    'valid-move-marker-${fila + 1}-${columna + 1}',
+                                                  ),
+                                                  color: const Color(
+                                                    0xFF15803D,
+                                                  ),
+                                                  size: 16,
+                                                )
+                                              : esCeldaInicial
                                               ? const Text(
                                                   '+',
                                                   style: TextStyle(
@@ -375,10 +484,11 @@ class _TableroPageState extends State<TableroPage> {
                   ),
                   const SizedBox(height: 16),
                   if (_validadorInicio.jugando)
-                    Center(
-                      child: LanzamientoDados(
-                        valoresPresentes: _valores.values.toSet(),
-                      ),
+                    LanzamientoDados(
+                      valoresPresentes: _valores.values.toSet(),
+                      opcionSeleccionada: _opcionAnclaSeleccionada,
+                      onAnclaSeleccionada: _seleccionarOpcionAncla,
+                      random: widget.random,
                     ),
                   if (!_validadorInicio.jugando) ...[
                     SizedBox(
