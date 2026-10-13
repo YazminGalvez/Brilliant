@@ -2,9 +2,17 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:juego_brilliant/dados.dart';
+import 'package:juego_brilliant/validador_anclas.dart';
 
 class LanzamientoDados extends StatefulWidget {
-  const LanzamientoDados({super.key});
+  const LanzamientoDados({
+    required this.valoresPresentes,
+    this.onAnclaSeleccionada,
+    super.key,
+  });
+
+  final Set<int> valoresPresentes;
+  final ValueChanged<OpcionAncla>? onAnclaSeleccionada;
 
   @override
   State<LanzamientoDados> createState() => _LanzamientoDadosState();
@@ -41,14 +49,58 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
   ]).animate(_controlador);
 
   List<int?> _resultados = [null, null];
+  OpcionAncla? _opcionSeleccionada;
+
+  @override
+  void didUpdateWidget(covariant LanzamientoDados oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_mismosValores(oldWidget.valoresPresentes, widget.valoresPresentes) &&
+        _opcionSeleccionada != null &&
+        !widget.valoresPresentes.contains(_opcionSeleccionada!.ancla)) {
+      _opcionSeleccionada = null;
+    }
+  }
 
   void _lanzarDados() {
     if (_controlador.isAnimating) return;
 
     setState(() {
       _resultados = _dados.lanzar();
+      _opcionSeleccionada = null;
     });
     _controlador.forward(from: 0);
+  }
+
+  void _seleccionarOpcion(OpcionAncla opcion) {
+    if (!opcion.puedeSeleccionarse) return;
+
+    setState(() {
+      _opcionSeleccionada = opcion;
+    });
+    widget.onAnclaSeleccionada?.call(opcion);
+  }
+
+  bool _mismosValores(Set<int> primero, Set<int> segundo) =>
+      primero.length == segundo.length && primero.containsAll(segundo);
+
+  List<OpcionAncla> get _opcionesAncla {
+    if (_resultados.any((resultado) => resultado == null)) return const [];
+
+    final primero = _resultados[0]!;
+    final segundo = _resultados[1]!;
+    return [
+      OpcionAncla(
+        ancla: primero,
+        numeroAColocar: segundo,
+        puedeSeleccionarse: widget.valoresPresentes.contains(primero),
+      ),
+      if (primero != segundo)
+        OpcionAncla(
+          ancla: segundo,
+          numeroAColocar: primero,
+          puedeSeleccionarse: widget.valoresPresentes.contains(segundo),
+        ),
+    ];
   }
 
   @override
@@ -59,52 +111,143 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final widthPanelDados = constraints.maxWidth < 330
+            ? constraints.maxWidth
+            : 330.0;
+        final widthPanelAnclas = constraints.maxWidth < 460
+            ? constraints.maxWidth
+            : 220.0;
+        final contenidoDados = Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            for (var index = 0; index < _resultados.length; index++) ...[
-              if (index > 0) const SizedBox(width: 24),
-              AnimatedBuilder(
-                animation: _controlador,
-                child: _CaraDado(valor: _resultados[index] ?? 1),
-                builder: (context, child) => Transform.rotate(
-                  angle: _rotacion.value * (index.isEven ? 1 : -1),
-                  child: Transform.scale(scale: _escala.value, child: child),
-                ),
-              ),
-            ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var index = 0; index < _resultados.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 24),
+                  AnimatedBuilder(
+                    animation: _controlador,
+                    child: _CaraDado(valor: _resultados[index] ?? 1),
+                    builder: (context, child) => Transform.rotate(
+                      angle: _rotacion.value * (index.isEven ? 1 : -1),
+                      child: Transform.scale(
+                        scale: _escala.value,
+                        child: child,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var index = 0; index < _resultados.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 24),
+                  Semantics(
+                    label:
+                        'Dado ${index + 1}: ${_resultados[index] ?? "sin lanzar"}',
+                    child: ExcludeSemantics(
+                      child: Text(
+                        'Dado ${index + 1}: ${_resultados[index] ?? "—"}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const Key('roll-dice-button'),
+              onPressed: _controlador.isAnimating ? null : _lanzarDados,
+              icon: const Icon(Icons.casino),
+              label: const Text('Lanzar dados'),
+            ),
           ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        );
+
+        final opciones = _opcionesAncla;
+        final panelAnclas = opciones.isEmpty
+            ? const SizedBox.shrink()
+            : _PanelOpcionesAncla(
+                opciones: opciones,
+                seleccionada: _opcionSeleccionada,
+                onSeleccionar: _seleccionarOpcion,
+              );
+
+        return Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 20,
+          runSpacing: 20,
           children: [
-            for (var index = 0; index < _resultados.length; index++) ...[
-              if (index > 0) const SizedBox(width: 24),
-              Semantics(
-                label:
-                    'Dado ${index + 1}: ${_resultados[index] ?? "sin lanzar"}',
-                child: ExcludeSemantics(
-                  child: Text(
-                    'Dado ${index + 1}: ${_resultados[index] ?? "—"}',
-                    style: Theme.of(context).textTheme.titleMedium,
+            SizedBox(width: widthPanelDados, child: contenidoDados),
+            if (opciones.isNotEmpty)
+              SizedBox(width: widthPanelAnclas, child: panelAnclas),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PanelOpcionesAncla extends StatelessWidget {
+  const _PanelOpcionesAncla({
+    required this.opciones,
+    required this.seleccionada,
+    required this.onSeleccionar,
+  });
+
+  final List<OpcionAncla> opciones;
+  final OpcionAncla? seleccionada;
+  final ValueChanged<OpcionAncla> onSeleccionar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const Key('anchor-options-panel'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Elige un ancla',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            for (final opcion in opciones)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: Key('anchor-option-${opcion.ancla}'),
+                    onPressed: opcion.puedeSeleccionarse
+                        ? () => onSeleccionar(opcion)
+                        : null,
+                    style: seleccionada?.ancla == opcion.ancla
+                        ? OutlinedButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
+                          )
+                        : null,
+                    child: Text(
+                      'Ancla ${opcion.ancla} · colocar ${opcion.numeroAColocar}',
+                    ),
                   ),
                 ),
               ),
-            ],
           ],
         ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          key: const Key('roll-dice-button'),
-          onPressed: _controlador.isAnimating ? null : _lanzarDados,
-          icon: const Icon(Icons.casino),
-          label: const Text('Lanzar dados'),
-        ),
-      ],
+      ),
     );
   }
 }

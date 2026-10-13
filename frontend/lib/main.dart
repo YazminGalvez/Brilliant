@@ -375,7 +375,11 @@ class _TableroPageState extends State<TableroPage> {
                   ),
                   const SizedBox(height: 16),
                   if (_validadorInicio.jugando)
-                    const Center(child: LanzamientoDados()),
+                    Center(
+                      child: LanzamientoDados(
+                        valoresPresentes: _valores.values.toSet(),
+                      ),
+                    ),
                   if (!_validadorInicio.jugando) ...[
                     SizedBox(
                       width: double.infinity,
