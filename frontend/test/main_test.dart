@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/main.dart';
+import 'package:juego_brilliant/dados.dart';
 
 void main() {
   const coordenadasIniciales = [(1, 3), (2, 6), (4, 2), (4, 5), (6, 3), (7, 5)];
@@ -191,4 +192,77 @@ void main() {
     );
     expect(marcadoresValidos(), findsNothing);
   });
+
+  testWidgets('confirma una celda y bloquea el ancla hasta lanzar de nuevo', (
+    tester,
+  ) async {
+    final seed = _buscarSemillaParaTirada([4, 6]);
+    await tester.pumpWidget(
+      MaterialApp(home: TableroPage(random: Random(seed))),
+    );
+
+    for (var index = 0; index < coordenadasIniciales.length; index++) {
+      await ingresarNumero(tester, coordenadasIniciales[index], index + 1);
+    }
+
+    final inicio = find.byKey(const Key('start-game'));
+    await tester.ensureVisible(inicio);
+    await tester.tap(inicio);
+    await tester.pumpAndSettle();
+
+    final botonLanzar = find.byKey(const Key('roll-dice-button'));
+    await tester.ensureVisible(botonLanzar);
+    await tester.tap(botonLanzar);
+    await tester.pumpAndSettle();
+
+    final opcionAnclaCuatro = find.byKey(const Key('anchor-option-4'));
+    expect(
+      tester.widget<OutlinedButton>(opcionAnclaCuatro).onPressed,
+      isNotNull,
+    );
+    await tester.ensureVisible(opcionAnclaCuatro);
+    await tester.tap(opcionAnclaCuatro);
+    await tester.pumpAndSettle();
+
+    final destino = find.byKey(const Key('cell-4-4'));
+    expect(find.byKey(const Key('valid-move-marker-4-4')), findsOneWidget);
+    await tester.ensureVisible(destino);
+    await tester.tap(destino);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: destino, matching: find.text('6')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('valid-move-marker-4-4')), findsNothing);
+    expect(find.text('Puntuación total: 0'), findsOneWidget);
+    expect(find.byKey(const Key('zone-score-0')), findsNothing);
+    expect(
+      tester
+          .widgetList<OutlinedButton>(find.byType(OutlinedButton))
+          .every((opcion) => opcion.onPressed == null),
+      isTrue,
+    );
+
+    await tester.ensureVisible(botonLanzar);
+    await tester.tap(botonLanzar);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widgetList<OutlinedButton>(find.byType(OutlinedButton))
+          .any((opcion) => opcion.onPressed != null),
+      isTrue,
+    );
+  });
+}
+
+int _buscarSemillaParaTirada(List<int> objetivo) {
+  for (var semilla = 0; semilla < 10000; semilla++) {
+    final tirada = Dados(cantidad: 2, random: Random(semilla)).lanzar();
+    if (tirada[0] == objetivo[0] && tirada[1] == objetivo[1]) {
+      return semilla;
+    }
+  }
+  throw StateError('No se encontró semilla para la tirada solicitada.');
 }

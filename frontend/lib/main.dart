@@ -170,8 +170,14 @@ class TableroPage extends StatefulWidget {
 class _TableroPageState extends State<TableroPage> {
   final ValidadorInicio _validadorInicio = ValidadorInicio();
   final Map<(int, int), int> _valores = {};
+  final Map<int, int> _puntajesPorZona = {};
+  final Set<int> _zonasPuntuadas = {};
   OpcionAncla? _opcionAnclaSeleccionada;
   Set<(int, int)> _destinosValidos = {};
+  bool _tiradaConsumida = false;
+
+  int get _puntajeTotal =>
+      _puntajesPorZona.values.fold(0, (total, puntos) => total + puntos);
 
   List<int?> get _valoresIniciales => [
     for (final coordenada in ValidadorInicio.celdasIniciales)
@@ -223,6 +229,7 @@ class _TableroPageState extends State<TableroPage> {
       setState(() {
         _opcionAnclaSeleccionada = null;
         _destinosValidos = {};
+        _tiradaConsumida = false;
       });
       return;
     }
@@ -241,13 +248,25 @@ class _TableroPageState extends State<TableroPage> {
     });
   }
 
+  void _confirmarMovimiento(int fila, int columna) {
+    final opcion = _opcionAnclaSeleccionada;
+    if (opcion == null || !_destinosValidos.contains((fila, columna))) return;
+
+    if (_guardarNumero(fila, columna, opcion.numeroAColocar)) {
+      setState(() {
+        _tiradaConsumida = true;
+      });
+    }
+  }
+
   Future<void> _editarCelda(int fila, int columna) async {
-    final destino = (fila, columna);
-    if (_destinosValidos.contains(destino) &&
+    if (_destinosValidos.contains((fila, columna)) &&
         _opcionAnclaSeleccionada != null) {
-      _guardarNumero(fila, columna, _opcionAnclaSeleccionada!.numeroAColocar);
+      _confirmarMovimiento(fila, columna);
       return;
     }
+
+    if (_validadorInicio.jugando) return;
 
     final coordenada = (fila + 1, columna + 1);
     final esCeldaInicial = ValidadorInicio.celdasIniciales.contains(coordenada);
@@ -294,6 +313,9 @@ class _TableroPageState extends State<TableroPage> {
       setState(() {
         _valores.remove(coordenada);
         if (esCeldaInicial) _actualizarEstadoInicial();
+        if (_validadorInicio.jugando) {
+          _actualizarEstadoPuntuacion(fila, columna);
+        }
         _opcionAnclaSeleccionada = null;
         _destinosValidos = {};
       });
@@ -303,7 +325,7 @@ class _TableroPageState extends State<TableroPage> {
     _guardarNumero(fila, columna, valor);
   }
 
-  void _guardarNumero(int fila, int columna, int valor) {
+  bool _guardarNumero(int fila, int columna, int valor) {
     final color = mapaColores[fila][columna];
     final idZona = _mapaIdsZonas[fila][columna];
     final valoresZona = <int>[
@@ -331,7 +353,7 @@ class _TableroPageState extends State<TableroPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Regla de la zona: ${descripcionRegla(color)}')),
       );
-      return;
+      return false;
     }
 
     setState(() {
@@ -339,10 +361,50 @@ class _TableroPageState extends State<TableroPage> {
       if (ValidadorInicio.celdasIniciales.contains((fila + 1, columna + 1))) {
         _actualizarEstadoInicial();
       }
+      if (_validadorInicio.jugando) {
+        _actualizarEstadoPuntuacion(fila, columna);
+      }
       _opcionAnclaSeleccionada = null;
       _destinosValidos = {};
     });
+    return true;
   }
+
+  void _actualizarEstadoPuntuacion(int fila, int columna) {
+    final idZona = _mapaIdsZonas[fila][columna];
+    final zonaCompleta = [
+      for (var filaZona = 0; filaZona < _mapaIdsZonas.length; filaZona++)
+        for (
+          var columnaZona = 0;
+          columnaZona < _mapaIdsZonas[filaZona].length;
+          columnaZona++
+        )
+          if (_mapaIdsZonas[filaZona][columnaZona] == idZona)
+            _valores.containsKey((filaZona + 1, columnaZona + 1)),
+    ].every((tieneValor) => tieneValor);
+
+    if (!zonaCompleta || !_zonasPuntuadas.add(idZona)) return;
+
+    final color = mapaColores[fila][columna];
+    _puntajesPorZona[idZona] = _puntosPorPrimeraCompletacion(color);
+  }
+
+  int _puntosPorPrimeraCompletacion(ColorZonaBrilliant color) =>
+      switch (color) {
+        ColorZonaBrilliant.amarillo => 8,
+        ColorZonaBrilliant.verde => 4,
+        ColorZonaBrilliant.azul => 7,
+        ColorZonaBrilliant.morado => 6,
+        ColorZonaBrilliant.rojo => 6,
+      };
+
+  String _nombreZona(ColorZonaBrilliant color) => switch (color) {
+    ColorZonaBrilliant.amarillo => 'Amarilla',
+    ColorZonaBrilliant.verde => 'Verde',
+    ColorZonaBrilliant.azul => 'Azul',
+    ColorZonaBrilliant.morado => 'Morada',
+    ColorZonaBrilliant.rojo => 'Roja',
+  };
 
   Color _colorDeZona(ColorZonaBrilliant color) => switch (color) {
     ColorZonaBrilliant.amarillo => const Color(0xFFFEF3C7),
@@ -378,6 +440,10 @@ class _TableroPageState extends State<TableroPage> {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (_validadorInicio.jugando) ...[
+                    const SizedBox(height: 12),
+                    _construirMarcador(),
+                  ],
                   const SizedBox(height: 20),
                   Center(
                     child: ConstrainedBox(
@@ -487,6 +553,7 @@ class _TableroPageState extends State<TableroPage> {
                     LanzamientoDados(
                       valoresPresentes: _valores.values.toSet(),
                       opcionSeleccionada: _opcionAnclaSeleccionada,
+                      tiradaConsumida: _tiradaConsumida,
                       onAnclaSeleccionada: _seleccionarOpcionAncla,
                       random: widget.random,
                     ),
@@ -516,5 +583,45 @@ class _TableroPageState extends State<TableroPage> {
         ),
       ),
     );
+  }
+
+  Widget _construirMarcador() {
+    final zonasConPuntos = _puntajesPorZona.keys.toList()..sort();
+    return Card(
+      key: const Key('scoreboard'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Puntuación total: $_puntajeTotal',
+              key: const Key('total-score'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            if (zonasConPuntos.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              for (final idZona in zonasConPuntos)
+                Text(
+                  'Zona ${_nombreZona(_colorDeIdZona(idZona))} ${idZona + 1}: '
+                  '${_puntajesPorZona[idZona]} puntos',
+                  key: Key('zone-score-$idZona'),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  ColorZonaBrilliant _colorDeIdZona(int idZona) {
+    for (var fila = 0; fila < _mapaIdsZonas.length; fila++) {
+      for (var columna = 0; columna < _mapaIdsZonas[fila].length; columna++) {
+        if (_mapaIdsZonas[fila][columna] == idZona) {
+          return mapaColores[fila][columna];
+        }
+      }
+    }
+    throw StateError('No se encontró la zona $idZona en el tablero.');
   }
 }

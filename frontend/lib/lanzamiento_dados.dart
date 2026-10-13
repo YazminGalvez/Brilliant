@@ -7,6 +7,7 @@ import 'package:juego_brilliant/validador_anclas.dart';
 class LanzamientoDados extends StatefulWidget {
   const LanzamientoDados({
     required this.valoresPresentes,
+    this.tiradaConsumida = false,
     this.opcionSeleccionada,
     this.onAnclaSeleccionada,
     this.random,
@@ -14,6 +15,7 @@ class LanzamientoDados extends StatefulWidget {
   });
 
   final Set<int> valoresPresentes;
+  final bool tiradaConsumida;
   final OpcionAncla? opcionSeleccionada;
   final ValueChanged<OpcionAncla?>? onAnclaSeleccionada;
   final Random? random;
@@ -78,13 +80,17 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
       OpcionAncla(
         ancla: primero,
         numeroAColocar: segundo,
-        puedeSeleccionarse: widget.valoresPresentes.contains(primero),
+        puedeSeleccionarse:
+            !widget.tiradaConsumida &&
+            widget.valoresPresentes.contains(primero),
       ),
       if (primero != segundo)
         OpcionAncla(
           ancla: segundo,
           numeroAColocar: primero,
-          puedeSeleccionarse: widget.valoresPresentes.contains(segundo),
+          puedeSeleccionarse:
+              !widget.tiradaConsumida &&
+              widget.valoresPresentes.contains(segundo),
         ),
     ];
   }
@@ -204,7 +210,10 @@ class _PanelOpcionesAncla extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Elige un ancla',
+              seleccionada == null &&
+                      opciones.every((opcion) => !opcion.puedeSeleccionarse)
+                  ? 'Lanza los dados para elegir otra ancla'
+                  : 'Elige un ancla',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
