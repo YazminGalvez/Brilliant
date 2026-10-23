@@ -1,14 +1,9 @@
 name: juego_brilliant
-description: A sample command-line application.
+description: Lógica de dominio del juego de dados Brilliant (tablero 7x7).
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
 
 environment:
   sdk: ^3.9.0
-
-# Add regular dependencies here.
-dependencies:
-  path: ^1.9.0
 
 dev_dependencies:
   lints: ^6.0.0
