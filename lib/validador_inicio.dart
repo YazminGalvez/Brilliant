@@ -1,6 +1,7 @@
 enum EstadoInicialPartida { bloqueado, inicializado, jugando }
 
 class ValidadorInicio {
+  // Posiciones dadas por el profesor como (fila, columna), contando desde 1.
   static const List<(int, int)> celdasIniciales = [
     (1, 3),
     (2, 6),
@@ -10,7 +11,6 @@ class ValidadorInicio {
     (7, 5),
   ];
 
-  bool _valoresInicialesConfigurados = false;
   EstadoInicialPartida _estado = EstadoInicialPartida.bloqueado;
 
   EstadoInicialPartida get estado => _estado;
@@ -19,7 +19,7 @@ class ValidadorInicio {
   bool get jugando => _estado == EstadoInicialPartida.jugando;
 
   void actualizarValoresIniciales(List<int?> valores) {
-    if (!_sonValoresInicialesValidos(valores)) {
+    if (!sonValoresInicialesValidos(valores)) {
       _estado = EstadoInicialPartida.bloqueado;
       return;
     }
@@ -40,19 +40,6 @@ class ValidadorInicio {
 
   void reiniciar() {
     _estado = EstadoInicialPartida.bloqueado;
-    _valoresInicialesConfigurados = false;
-  }
-
-  void marcarValoresInicialesConfigurados() {
-    _valoresInicialesConfigurados = true;
-  }
-
-  void validarAvance() {
-    if (!_valoresInicialesConfigurados) {
-      throw StateError(
-        'Bloqueo activo: No se puede avanzar hasta proporcionar los valores iniciales.',
-      );
-    }
   }
 
   void validarAntesDeIniciar() {
@@ -63,7 +50,7 @@ class ValidadorInicio {
     }
   }
 
-  bool _sonValoresInicialesValidos(List<int?> valores) {
+  static bool sonValoresInicialesValidos(List<int?> valores) {
     if (valores.length != celdasIniciales.length ||
         valores.any((valor) => valor == null)) {
       return false;

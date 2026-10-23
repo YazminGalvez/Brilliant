@@ -7,11 +7,9 @@ class Tablero {
 
   final List<List<Coordenada>> _matrizCeldas;
   final List<Zona> _listaRegiones = [];
-  final ValidadorInicio _validadorInicio;
 
-  Tablero({ValidadorInicio? validadorInicio})
-    : _validadorInicio = validadorInicio ?? ValidadorInicio(),
-      _matrizCeldas = List.generate(
+  Tablero()
+    : _matrizCeldas = List.generate(
         cantidadFilas,
         (f) => List.generate(
           cantidadColumnas,
@@ -47,15 +45,40 @@ class Tablero {
     obtenerCelda(fila, columna).valor = valor;
   }
 
-  void establecerValoresIniciales(List<Zona> regionesIniciales) {
-    for (var region in regionesIniciales) {
-      agregarRegion(region);
+  // Celdas de ValidadorInicio.celdasIniciales (base 1) convertidas a base 0.
+  List<Coordenada> get _celdasIniciales => [
+    for (final (fila, columna) in ValidadorInicio.celdasIniciales)
+      obtenerCelda(fila - 1, columna - 1),
+  ];
+
+  List<int?> get valoresIniciales => [
+    for (final celda in _celdasIniciales) celda.valor,
+  ];
+
+  bool get inicializado =>
+      ValidadorInicio.sonValoresInicialesValidos(valoresIniciales);
+
+  void establecerValoresIniciales(List<int> valores) {
+    if (!ValidadorInicio.sonValoresInicialesValidos(valores)) {
+      throw ArgumentError(
+        'Los valores iniciales deben ser exactamente los números del 1 al 6, '
+        'sin repetir: $valores',
+      );
     }
-    _validadorInicio.marcarValoresInicialesConfigurados();
+
+    final celdasIniciales = _celdasIniciales;
+    for (var index = 0; index < valores.length; index++) {
+      celdasIniciales[index].valor = valores[index];
+    }
   }
 
   List<int?> extraerDatos() {
-    _validadorInicio.validarAvance();
+    if (!inicializado) {
+      throw StateError(
+        'Bloqueo activo: No se puede avanzar hasta que las celdas iniciales '
+        'contengan los números del 1 al 6.',
+      );
+    }
 
     final datosExtraidos = <int?>[];
     for (var f = 0; f < cantidadFilas; f++) {

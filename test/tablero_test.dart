@@ -11,15 +11,6 @@ void main() {
   ];
 
   group('Validador de inicio', () {
-    test('Bloquea el avance hasta configurar los valores iniciales', () {
-      final validador = ValidadorInicio();
-
-      expect(validador.validarAvance, throwsA(isA<StateError>()));
-
-      validador.marcarValoresInicialesConfigurados();
-      expect(validador.validarAvance, returnsNormally);
-    });
-
     test('Valida los valores y el estado de la partida', () {
       final tablero = Tablero();
       final validador = ValidadorInicio();
@@ -75,6 +66,112 @@ void main() {
         (7, 5),
       ]);
     });
+
+    test('No acepta valores iniciales con un null', () {
+      expect(
+        ValidadorInicio.sonValoresInicialesValidos([1, 2, 3, 4, 5, null]),
+        isFalse,
+      );
+    });
+  });
+
+  group('Bloqueo de valores iniciales del tablero', () {
+    test('Un tablero nuevo está bloqueado', () {
+      final tablero = Tablero();
+
+      expect(tablero.inicializado, isFalse);
+      expect(() => tablero.extraerDatos(), throwsA(isA<StateError>()));
+    });
+
+    test('Sigue bloqueado con 5 de 6 celdas iniciales llenas', () {
+      final tablero = Tablero();
+
+      for (var index = 0; index < 5; index++) {
+        final (fila, columna) = ValidadorInicio.celdasIniciales[index];
+        tablero.colocarDato(fila - 1, columna - 1, index + 1);
+      }
+
+      expect(tablero.inicializado, isFalse);
+      expect(() => tablero.extraerDatos(), throwsA(isA<StateError>()));
+    });
+
+    test('Rechaza valores repetidos y sigue bloqueado', () {
+      final tablero = Tablero();
+
+      expect(
+        () => tablero.establecerValoresIniciales([1, 1, 2, 3, 4, 5]),
+        throwsArgumentError,
+      );
+      expect(tablero.inicializado, isFalse);
+    });
+
+    test('Rechaza valores fuera del rango 1 a 6', () {
+      final tablero = Tablero();
+
+      expect(
+        () => tablero.establecerValoresIniciales([0, 1, 2, 3, 4, 5]),
+        throwsArgumentError,
+      );
+      expect(
+        () => tablero.establecerValoresIniciales([1, 2, 3, 4, 5, 7]),
+        throwsArgumentError,
+      );
+    });
+
+    test('Rechaza listas con 5 o 7 valores', () {
+      final tablero = Tablero();
+
+      expect(
+        () => tablero.establecerValoresIniciales([1, 2, 3, 4, 5]),
+        throwsArgumentError,
+      );
+      expect(
+        () => tablero.establecerValoresIniciales([1, 2, 3, 4, 5, 6, 7]),
+        throwsArgumentError,
+      );
+    });
+
+    test('Un intento inválido no deja ninguna celda inicial con valor', () {
+      final tablero = Tablero();
+
+      for (final valores in [
+        [1, 1, 2, 3, 4, 5],
+        [0, 1, 2, 3, 4, 5],
+        [1, 2, 3, 4, 5, 7],
+        [1, 2, 3, 4, 5],
+        [1, 2, 3, 4, 5, 6, 7],
+      ]) {
+        expect(
+          () => tablero.establecerValoresIniciales(valores),
+          throwsArgumentError,
+        );
+      }
+
+      expect(tablero.valoresIniciales, everyElement(isNull));
+    });
+
+    test('Acepta los valores en cualquier orden y desbloquea', () {
+      final tablero = Tablero();
+      const valores = [6, 5, 4, 3, 2, 1];
+
+      tablero.establecerValoresIniciales(valores);
+
+      expect(tablero.inicializado, isTrue);
+      expect(leerValoresIniciales(tablero), valores);
+      expect(tablero.valoresIniciales, valores);
+      expect(() => tablero.extraerDatos(), returnsNormally);
+    });
+
+    test('Vuelve a bloquearse si se borra una celda inicial', () {
+      final tablero = Tablero();
+      tablero.establecerValoresIniciales([1, 2, 3, 4, 5, 6]);
+
+      final (fila, columna) = ValidadorInicio.celdasIniciales.first;
+      tablero.colocarDato(fila - 1, columna - 1, null);
+
+      expect(tablero.inicializado, isFalse);
+      expect(() => tablero.extraerDatos(), throwsA(isA<StateError>()));
+    });
   });
 
   Tipo crearTipoVerde() {
@@ -109,13 +206,8 @@ void main() {
     });
     test('Extrae en orden de derecha a izquierda y arriba hacia abajo', () {
       final tablero = Tablero();
-      final region = Zona(
-        id: 1,
-        tipo: crearTipoVerde(),
-        coordenadas: [tablero.obtenerCelda(0, 0)],
-      );
 
-      tablero.establecerValoresIniciales([region]);
+      tablero.establecerValoresIniciales([1, 2, 3, 4, 5, 6]);
       tablero.colocarDato(0, 6, 1);
       tablero.colocarDato(0, 5, 2);
       tablero.colocarDato(1, 6, 3);
