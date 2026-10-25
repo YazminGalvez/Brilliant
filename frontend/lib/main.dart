@@ -131,12 +131,12 @@ List<List<int>> _crearMapaIdsZonas() {
   return ids;
 }
 
-String descripcionRegla(ColorZonaBrilliant color) => switch (color) {
-  ColorZonaBrilliant.amarillo => 'Todos los números deben ser distintos',
-  ColorZonaBrilliant.verde => 'Se puede colocar cualquier número',
-  ColorZonaBrilliant.azul => 'Todos los números deben ser iguales',
-  ColorZonaBrilliant.morado => 'Máximo dos números diferentes por zona',
-  ColorZonaBrilliant.rojo => 'Todos los números deben ser distintos',
+modelo.Tipo tipoDeColor(ColorZonaBrilliant color) => switch (color) {
+  ColorZonaBrilliant.amarillo => modelo.TipoAmarillo(),
+  ColorZonaBrilliant.verde => modelo.TipoVerde(),
+  ColorZonaBrilliant.azul => modelo.TipoAzul(),
+  ColorZonaBrilliant.morado => modelo.TipoMorado(),
+  ColorZonaBrilliant.rojo => modelo.TipoRojo(),
 };
 
 void main() {
@@ -212,14 +212,9 @@ class _TableroPageState extends State<TableroPage> {
 
     for (final entrada in coordenadasPorZona.entries) {
       final primeraCelda = entrada.value.first;
-      final tipo =
-          switch (mapaColores[primeraCelda.fila][primeraCelda.columna]) {
-            ColorZonaBrilliant.amarillo => modelo.TipoAmarillo(),
-            ColorZonaBrilliant.verde => modelo.TipoVerde(),
-            ColorZonaBrilliant.azul => modelo.TipoAzul(),
-            ColorZonaBrilliant.morado => modelo.TipoMorado(),
-            ColorZonaBrilliant.rojo => modelo.TipoRojo(),
-          };
+      final tipo = tipoDeColor(
+        mapaColores[primeraCelda.fila][primeraCelda.columna],
+      );
       tablero.agregarRegion(
         Zona(id: entrada.key, tipo: tipo, coordenadas: entrada.value),
       );
@@ -344,18 +339,11 @@ class _TableroPageState extends State<TableroPage> {
               _valores.containsKey((filaZona + 1, columnaZona + 1)))
             _valores[(filaZona + 1, columnaZona + 1)]!,
     ];
-    final esValido = switch (color) {
-      ColorZonaBrilliant.amarillo ||
-      ColorZonaBrilliant.rojo => !valoresZona.contains(valor),
-      ColorZonaBrilliant.verde => true,
-      ColorZonaBrilliant.azul =>
-        valoresZona.isEmpty || valoresZona.every((actual) => actual == valor),
-      ColorZonaBrilliant.morado => {...valoresZona, valor}.length <= 2,
-    };
+    final tipo = tipoDeColor(color);
 
-    if (!esValido) {
+    if (!tipo.esPosibleAgregar(valoresZona, valor)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Regla de la zona: ${descripcionRegla(color)}')),
+        SnackBar(content: Text('Regla de la zona: ${tipo.descripcion}')),
       );
       return false;
     }
@@ -390,25 +378,8 @@ class _TableroPageState extends State<TableroPage> {
     if (!zonaCompleta || !_zonasPuntuadas.add(idZona)) return;
 
     final color = mapaColores[fila][columna];
-    _puntajesPorZona[idZona] = _puntosPorPrimeraCompletacion(color);
+    _puntajesPorZona[idZona] = tipoDeColor(color).calcularPuntuacion(1);
   }
-
-  int _puntosPorPrimeraCompletacion(ColorZonaBrilliant color) =>
-      switch (color) {
-        ColorZonaBrilliant.amarillo => 8,
-        ColorZonaBrilliant.verde => 4,
-        ColorZonaBrilliant.azul => 7,
-        ColorZonaBrilliant.morado => 6,
-        ColorZonaBrilliant.rojo => 6,
-      };
-
-  String _nombreZona(ColorZonaBrilliant color) => switch (color) {
-    ColorZonaBrilliant.amarillo => 'Amarilla',
-    ColorZonaBrilliant.verde => 'Verde',
-    ColorZonaBrilliant.azul => 'Azul',
-    ColorZonaBrilliant.morado => 'Morada',
-    ColorZonaBrilliant.rojo => 'Roja',
-  };
 
   Color _colorDeZona(ColorZonaBrilliant color) => switch (color) {
     ColorZonaBrilliant.amarillo => const Color(0xFFFEF3C7),
@@ -666,7 +637,7 @@ class _TableroPageState extends State<TableroPage> {
               const SizedBox(height: 4),
               for (final idZona in zonasConPuntos)
                 Text(
-                  'Zona ${_nombreZona(_colorDeIdZona(idZona))} ${idZona + 1}: '
+                  'Zona ${tipoDeColor(_colorDeIdZona(idZona)).nombre} ${idZona + 1}: '
                   '${_puntajesPorZona[idZona]} puntos',
                   key: Key('zone-score-$idZona'),
                 ),
