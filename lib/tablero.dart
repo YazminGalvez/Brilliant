@@ -18,6 +18,27 @@ class Tablero {
       );
 
   List<Zona> get regiones => List.unmodifiable(_listaRegiones);
+
+  int get puntuacionTotal => _listaRegiones.fold(
+    0,
+    (total, region) => total + region.puntosObtenidos,
+  );
+
+  int get puntuacionMaxima => _listaRegiones.fold(
+    0,
+    (total, region) => total + region.tipo.calcularPuntuacion(1),
+  );
+
+  Map<int, int> get puntuacionPorZona {
+    final zonasCompletas = [
+      for (final region in _listaRegiones)
+        if (region.verificarCompletado()) region,
+    ]..sort((a, b) => a.id.compareTo(b.id));
+
+    return Map.unmodifiable({
+      for (final region in zonasCompletas) region.id: region.puntosObtenidos,
+    });
+  }
   Set<int> get valoresColocados => {
     for (final celda in celdas)
       if (celda.valor != null) celda.valor!,

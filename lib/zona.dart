@@ -75,6 +75,9 @@ class Zona {
     return tipo.esPosibleAgregar(obtenerValores(), posible);
   }
 
+  int get puntosObtenidos =>
+      verificarCompletado() ? tipo.calcularPuntuacion(1) : 0;
+
   bool verificarCompletado() {
     if (coordenadas.any((coordenada) => coordenada.valor == null)) {
       completado = false;

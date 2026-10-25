@@ -174,14 +174,9 @@ class _TableroPageState extends State<TableroPage> {
   final HistorialLanzamientos _historialLanzamientos =
       HistorialLanzamientos();
   final Map<(int, int), int> _valores = {};
-  final Map<int, int> _puntajesPorZona = {};
-  final Set<int> _zonasPuntuadas = {};
   OpcionAncla? _opcionAnclaSeleccionada;
   Set<(int, int)> _destinosValidos = {};
   bool _tiradaConsumida = false;
-
-  int get _puntajeTotal =>
-      _puntajesPorZona.values.fold(0, (total, puntos) => total + puntos);
 
   List<int?> get _valoresIniciales => [
     for (final coordenada in ValidadorInicio.celdasIniciales)
@@ -312,9 +307,6 @@ class _TableroPageState extends State<TableroPage> {
       setState(() {
         _valores.remove(coordenada);
         if (esCeldaInicial) _actualizarEstadoInicial();
-        if (_validadorInicio.jugando) {
-          _actualizarEstadoPuntuacion(fila, columna);
-        }
         _opcionAnclaSeleccionada = null;
         _destinosValidos = {};
       });
@@ -353,32 +345,10 @@ class _TableroPageState extends State<TableroPage> {
       if (ValidadorInicio.celdasIniciales.contains((fila + 1, columna + 1))) {
         _actualizarEstadoInicial();
       }
-      if (_validadorInicio.jugando) {
-        _actualizarEstadoPuntuacion(fila, columna);
-      }
       _opcionAnclaSeleccionada = null;
       _destinosValidos = {};
     });
     return true;
-  }
-
-  void _actualizarEstadoPuntuacion(int fila, int columna) {
-    final idZona = _mapaIdsZonas[fila][columna];
-    final zonaCompleta = [
-      for (var filaZona = 0; filaZona < _mapaIdsZonas.length; filaZona++)
-        for (
-          var columnaZona = 0;
-          columnaZona < _mapaIdsZonas[filaZona].length;
-          columnaZona++
-        )
-          if (_mapaIdsZonas[filaZona][columnaZona] == idZona)
-            _valores.containsKey((filaZona + 1, columnaZona + 1)),
-    ].every((tieneValor) => tieneValor);
-
-    if (!zonaCompleta || !_zonasPuntuadas.add(idZona)) return;
-
-    final color = mapaColores[fila][columna];
-    _puntajesPorZona[idZona] = tipoDeColor(color).calcularPuntuacion(1);
   }
 
   Color _colorDeZona(ColorZonaBrilliant color) => switch (color) {
@@ -620,7 +590,8 @@ class _TableroPageState extends State<TableroPage> {
   }
 
   Widget _construirMarcador() {
-    final zonasConPuntos = _puntajesPorZona.keys.toList()..sort();
+    final tablero = _crearTableroParaValidarAnclas();
+    final puntuacionPorZona = tablero.puntuacionPorZona;
     return Card(
       key: const Key('scoreboard'),
       child: Padding(
@@ -629,16 +600,17 @@ class _TableroPageState extends State<TableroPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Puntuación total: $_puntajeTotal',
+              'Puntuación total: ${tablero.puntuacionTotal}',
               key: const Key('total-score'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            if (zonasConPuntos.isNotEmpty) ...[
+            if (puntuacionPorZona.isNotEmpty) ...[
               const SizedBox(height: 4),
-              for (final idZona in zonasConPuntos)
+              for (final MapEntry(key: idZona, value: puntos)
+                  in puntuacionPorZona.entries)
                 Text(
                   'Zona ${tipoDeColor(_colorDeIdZona(idZona)).nombre} ${idZona + 1}: '
-                  '${_puntajesPorZona[idZona]} puntos',
+                  '$puntos puntos',
                   key: Key('zone-score-$idZona'),
                 ),
             ],
