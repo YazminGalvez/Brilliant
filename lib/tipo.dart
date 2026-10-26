@@ -1,12 +1,25 @@
 // lib/tipo.dart
 
+import 'color_zona.dart';
+
 class Color {
   final int value;
   const Color(this.value);
 }
 
 abstract class Tipo {
+  Tipo();
+
+  factory Tipo.deColor(ColorZona color) => switch (color) {
+    ColorZona.amarillo => TipoAmarillo(),
+    ColorZona.verde => TipoVerde(),
+    ColorZona.azul => TipoAzul(),
+    ColorZona.morado => TipoMorado(),
+    ColorZona.rojo => TipoRojo(),
+  };
+
   Color get color;
+  ColorZona get colorZona;
   String get nombre;
   String get descripcion;
   bool esPosibleAgregar(List<int> actuales, int posible);
@@ -26,6 +39,9 @@ abstract class Tipo {
 }
 
 class TipoAzul extends Tipo {
+  @override
+  ColorZona get colorZona => ColorZona.azul;
+
   @override
   Color get color => const Color(0xFF2196F3);
 
@@ -50,6 +66,9 @@ class TipoAzul extends Tipo {
 
 class TipoRojo extends Tipo {
   @override
+  ColorZona get colorZona => ColorZona.rojo;
+
+  @override
   Color get color => const Color(0xFFF44336);
 
   @override
@@ -72,6 +91,9 @@ class TipoRojo extends Tipo {
 }
 
 class TipoVerde extends Tipo {
+  @override
+  ColorZona get colorZona => ColorZona.verde;
+
   @override
   Color get color => const Color(0xFF4CAF50);
 
@@ -96,6 +118,9 @@ class TipoVerde extends Tipo {
 
 class TipoMorado extends Tipo {
   @override
+  ColorZona get colorZona => ColorZona.morado;
+
+  @override
   Color get color => const Color(0xFF9C27B0);
 
   @override
@@ -119,6 +144,9 @@ class TipoMorado extends Tipo {
 }
 
 class TipoAmarillo extends Tipo {
+  @override
+  ColorZona get colorZona => ColorZona.amarillo;
+
   @override
   Color get color => const Color(0xFFFFC107);
 

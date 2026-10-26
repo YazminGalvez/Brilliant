@@ -1,142 +1,22 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/historial_lanzamientos.dart';
+import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/tablero.dart';
-import 'package:juego_brilliant/tipo.dart' as modelo;
 import 'package:juego_brilliant/validador_anclas.dart';
 import 'package:juego_brilliant/validador_inicio.dart';
 import 'package:juego_brilliant/zona.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
 
-enum ColorZonaBrilliant { amarillo, verde, azul, morado, rojo }
-
-const List<List<ColorZonaBrilliant>> mapaColores = [
-  [
-    ColorZonaBrilliant.amarillo,
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.azul,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.amarillo,
-  ],
-  [
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.azul,
-    ColorZonaBrilliant.azul,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.verde,
-  ],
-  [
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.azul,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.verde,
-  ],
-  [
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.amarillo,
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.verde,
-  ],
-  [
-    ColorZonaBrilliant.verde,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.azul,
-  ],
-  [
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.azul,
-    ColorZonaBrilliant.azul,
-  ],
-  [
-    ColorZonaBrilliant.amarillo,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.morado,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.rojo,
-    ColorZonaBrilliant.azul,
-    ColorZonaBrilliant.amarillo,
-  ],
-];
-
-final List<List<int>> _mapaIdsZonas = _crearMapaIdsZonas();
-
-List<List<int>> _crearMapaIdsZonas() {
-  final ids = List.generate(7, (_) => List.filled(7, -1));
-  var siguienteId = 0;
-
-  for (var fila = 0; fila < 7; fila++) {
-    for (var columna = 0; columna < 7; columna++) {
-      if (ids[fila][columna] != -1) continue;
-
-      final color = mapaColores[fila][columna];
-      final pendientes = <(int, int)>[(fila, columna)];
-      ids[fila][columna] = siguienteId;
-
-      while (pendientes.isNotEmpty) {
-        final (filaActual, columnaActual) = pendientes.removeLast();
-        for (final (deltaFila, deltaColumna) in [
-          (-1, 0),
-          (1, 0),
-          (0, -1),
-          (0, 1),
-        ]) {
-          final filaVecina = filaActual + deltaFila;
-          final columnaVecina = columnaActual + deltaColumna;
-          if (filaVecina < 0 ||
-              filaVecina >= 7 ||
-              columnaVecina < 0 ||
-              columnaVecina >= 7 ||
-              ids[filaVecina][columnaVecina] != -1 ||
-              mapaColores[filaVecina][columnaVecina] != color) {
-            continue;
-          }
-
-          ids[filaVecina][columnaVecina] = siguienteId;
-          pendientes.add((filaVecina, columnaVecina));
-        }
-      }
-      siguienteId++;
-    }
-  }
-
-  final idZonaAmarilla = ids[0][0];
-  for (var fila = 0; fila < 7; fila++) {
-    for (var columna = 0; columna < 7; columna++) {
-      if (mapaColores[fila][columna] == ColorZonaBrilliant.amarillo) {
-        ids[fila][columna] = idZonaAmarilla;
-      }
-    }
-  }
-
-  return ids;
-}
-
-modelo.Tipo tipoDeColor(ColorZonaBrilliant color) => switch (color) {
-  ColorZonaBrilliant.amarillo => modelo.TipoAmarillo(),
-  ColorZonaBrilliant.verde => modelo.TipoVerde(),
-  ColorZonaBrilliant.azul => modelo.TipoAzul(),
-  ColorZonaBrilliant.morado => modelo.TipoMorado(),
-  ColorZonaBrilliant.rojo => modelo.TipoRojo(),
+Color colorDe(ColorZona color) => switch (color) {
+  ColorZona.amarillo => const Color(0xFFFEF3C7),
+  ColorZona.verde => const Color(0xFFDCFCE7),
+  ColorZona.azul => const Color(0xFFDBEAFE),
+  ColorZona.morado => const Color(0xFFF3E8FF),
+  ColorZona.rojo => const Color(0xFFFEE2E2),
 };
 
 void main() {
@@ -193,30 +73,19 @@ class _TableroPageState extends State<TableroPage> {
   }
 
   Tablero _crearTableroParaValidarAnclas() {
-    final tablero = Tablero();
-    final coordenadasPorZona = <int, List<Coordenada>>{};
+    final tablero = mapaUno.crearTablero();
 
-    for (var fila = 0; fila < mapaColores.length; fila++) {
-      for (var columna = 0; columna < mapaColores[fila].length; columna++) {
+    for (var fila = 0; fila < Tablero.cantidadFilas; fila++) {
+      for (var columna = 0; columna < Tablero.cantidadColumnas; columna++) {
         tablero.colocarDato(fila, columna, _valores[(fila + 1, columna + 1)]);
-        coordenadasPorZona
-            .putIfAbsent(_mapaIdsZonas[fila][columna], () => [])
-            .add(tablero.obtenerCelda(fila, columna));
       }
-    }
-
-    for (final entrada in coordenadasPorZona.entries) {
-      final primeraCelda = entrada.value.first;
-      final tipo = tipoDeColor(
-        mapaColores[primeraCelda.fila][primeraCelda.columna],
-      );
-      tablero.agregarRegion(
-        Zona(id: entrada.key, tipo: tipo, coordenadas: entrada.value),
-      );
     }
 
     return tablero;
   }
+
+  Zona _zonaDe(Tablero tablero, int fila, int columna) => tablero.regiones
+      .firstWhere((zona) => zona.contieneCoordenada(fila, columna));
 
   void _seleccionarOpcionAncla(OpcionAncla? opcion) {
     if (opcion == null || !opcion.puedeSeleccionarse) {
@@ -317,21 +186,14 @@ class _TableroPageState extends State<TableroPage> {
   }
 
   bool _guardarNumero(int fila, int columna, int valor) {
-    final color = mapaColores[fila][columna];
-    final idZona = _mapaIdsZonas[fila][columna];
+    final zona = _zonaDe(_crearTableroParaValidarAnclas(), fila, columna);
     final valoresZona = <int>[
-      for (var filaZona = 0; filaZona < mapaColores.length; filaZona++)
-        for (
-          var columnaZona = 0;
-          columnaZona < mapaColores[filaZona].length;
-          columnaZona++
-        )
-          if (_mapaIdsZonas[filaZona][columnaZona] == idZona &&
-              (filaZona != fila || columnaZona != columna) &&
-              _valores.containsKey((filaZona + 1, columnaZona + 1)))
-            _valores[(filaZona + 1, columnaZona + 1)]!,
+      for (final celda in zona.coordenadas)
+        if ((celda.fila != fila || celda.columna != columna) &&
+            celda.valor != null)
+          celda.valor!,
     ];
-    final tipo = tipoDeColor(color);
+    final tipo = zona.tipo;
 
     if (!tipo.esPosibleAgregar(valoresZona, valor)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -350,14 +212,6 @@ class _TableroPageState extends State<TableroPage> {
     });
     return true;
   }
-
-  Color _colorDeZona(ColorZonaBrilliant color) => switch (color) {
-    ColorZonaBrilliant.amarillo => const Color(0xFFFEF3C7),
-    ColorZonaBrilliant.verde => const Color(0xFFDCFCE7),
-    ColorZonaBrilliant.azul => const Color(0xFFDBEAFE),
-    ColorZonaBrilliant.morado => const Color(0xFFF3E8FF),
-    ColorZonaBrilliant.rojo => const Color(0xFFFEE2E2),
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -407,7 +261,7 @@ class _TableroPageState extends State<TableroPage> {
                               itemBuilder: (context, index) {
                                 final fila = index ~/ 7;
                                 final columna = index % 7;
-                                final color = mapaColores[fila][columna];
+                                final color = mapaUno.colorEn(fila, columna);
                                 final coordenada = (fila + 1, columna + 1);
                                 final valor = _valores[coordenada];
                                 final esDestinoValido = _destinosValidos
@@ -421,7 +275,7 @@ class _TableroPageState extends State<TableroPage> {
                                   child: Material(
                                     color: esDestinoValido
                                         ? const Color(0xFFBBF7D0)
-                                        : _colorDeZona(color),
+                                        : colorDe(color),
                                     borderRadius: BorderRadius.circular(4),
                                     clipBehavior: Clip.antiAlias,
                                     child: InkWell(
@@ -609,7 +463,7 @@ class _TableroPageState extends State<TableroPage> {
               for (final MapEntry(key: idZona, value: puntos)
                   in puntuacionPorZona.entries)
                 Text(
-                  'Zona ${tipoDeColor(_colorDeIdZona(idZona)).nombre} ${idZona + 1}: '
+                  'Zona ${_nombreDeZona(tablero, idZona)} ${idZona + 1}: '
                   '$puntos puntos',
                   key: Key('zone-score-$idZona'),
                 ),
@@ -620,14 +474,6 @@ class _TableroPageState extends State<TableroPage> {
     );
   }
 
-  ColorZonaBrilliant _colorDeIdZona(int idZona) {
-    for (var fila = 0; fila < _mapaIdsZonas.length; fila++) {
-      for (var columna = 0; columna < _mapaIdsZonas[fila].length; columna++) {
-        if (_mapaIdsZonas[fila][columna] == idZona) {
-          return mapaColores[fila][columna];
-        }
-      }
-    }
-    throw StateError('No se encontró la zona $idZona en el tablero.');
-  }
+  String _nombreDeZona(Tablero tablero, int idZona) =>
+      tablero.regiones.firstWhere((zona) => zona.id == idZona).tipo.nombre;
 }
