@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/main.dart';
 import 'package:juego_brilliant/dados.dart';
+import 'package:juego_brilliant/mapa_uno.dart';
+import 'package:juego_brilliant/validador_anclas.dart';
 
 void main() {
   const coordenadasIniciales = [(1, 3), (2, 6), (4, 2), (4, 5), (6, 3), (7, 5)];
@@ -298,6 +300,110 @@ void main() {
       isTrue,
     );
   });
+
+  Future<void> iniciarPartida(WidgetTester tester, int semilla) async {
+    await tester.pumpWidget(
+      MaterialApp(home: TableroPage(random: Random(semilla))),
+    );
+    for (var index = 0; index < coordenadasIniciales.length; index++) {
+      await ingresarNumero(tester, coordenadasIniciales[index], index + 1);
+    }
+    final inicio = find.byKey(const Key('start-game'));
+    await tester.ensureVisible(inicio);
+    await tester.tap(inicio);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> tocar(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('registra la colocación en el historial de movimientos', (
+    tester,
+  ) async {
+    await iniciarPartida(tester, _buscarSemillaParaTirada([4, 6]));
+
+    expect(find.byKey(const Key('movement-history-empty')), findsOneWidget);
+
+    await tocar(tester, find.byKey(const Key('roll-dice-button')));
+    expect(find.byKey(const Key('skip-turn-button')), findsNothing);
+
+    await tocar(tester, find.byKey(const Key('anchor-option-4')));
+    await tocar(tester, find.byKey(const Key('cell-4-4')));
+
+    expect(
+      find.text('Tirada 1: colocaste el 6 en fila 4, columna 4 (ancla 4)'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('movement-history-item-1')), findsOneWidget);
+    expect(find.byKey(const Key('skip-turn-button')), findsNothing);
+  });
+
+  testWidgets('permite saltar el turno cuando la tirada no tiene jugadas', (
+    tester,
+  ) async {
+    final tableroEsperado = mapaUno.crearTablero()
+      ..establecerValoresIniciales([1, 2, 3, 4, 5, 6])
+      ..colocarDato(6, 5, 1);
+    expect(
+      ValidadorAnclas(tableroEsperado).hayMovimientosPosibles(6, 6),
+      isFalse,
+    );
+
+    await iniciarPartida(
+      tester,
+      _buscarSemillaParaTiradas([
+        [6, 1],
+        [6, 6],
+      ]),
+    );
+
+    await tocar(tester, find.byKey(const Key('roll-dice-button')));
+    expect(find.byKey(const Key('skip-turn-button')), findsNothing);
+
+    await tocar(tester, find.byKey(const Key('anchor-option-6')));
+    expect(find.byKey(const Key('valid-move-marker-7-6')), findsOneWidget);
+    await tocar(tester, find.byKey(const Key('cell-7-6')));
+
+    await tocar(tester, find.byKey(const Key('roll-dice-button')));
+    expect(find.byKey(const Key('skip-turn-button')), findsOneWidget);
+    expect(find.byKey(const Key('no-moves-message')), findsOneWidget);
+
+    await tocar(tester, find.byKey(const Key('skip-turn-button')));
+
+    expect(find.byKey(const Key('skip-turn-button')), findsNothing);
+    expect(find.byKey(const Key('no-moves-message')), findsNothing);
+    expect(find.text('Tirada 2: saltaste el turno'), findsOneWidget);
+    expect(find.text('Puntuación total: 0'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('cell-7-6')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('movement-history-list')),
+        matching: find.byType(ListTile),
+      ),
+      findsNWidgets(2),
+    );
+  });
+}
+
+int _buscarSemillaParaTiradas(List<List<int>> objetivo) {
+  for (var semilla = 0; semilla < 1000000; semilla++) {
+    final dados = Dados(cantidad: 2, random: Random(semilla));
+    final coincide = objetivo.every((tirada) {
+      final resultado = dados.lanzar();
+      return resultado[0] == tirada[0] && resultado[1] == tirada[1];
+    });
+    if (coincide) return semilla;
+  }
+  throw StateError('No se encontró semilla para las tiradas solicitadas.');
 }
 
 int _buscarSemillaParaTirada(List<int> objetivo) {

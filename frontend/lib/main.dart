@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/historial_lanzamientos.dart';
+import 'package:juego_brilliant/historial_movimientos.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/tablero.dart';
 import 'package:juego_brilliant/validador_anclas.dart';
@@ -10,6 +11,7 @@ import 'package:juego_brilliant/validador_inicio.dart';
 import 'package:juego_brilliant/zona.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
+import 'package:frontend/panel_historial_movimientos.dart';
 
 Color colorDe(ColorZona color) => switch (color) {
   ColorZona.amarillo => const Color(0xFFFEF3C7),
@@ -53,6 +55,8 @@ class _TableroPageState extends State<TableroPage> {
   final ValidadorInicio _validadorInicio = ValidadorInicio();
   final HistorialLanzamientos _historialLanzamientos =
       HistorialLanzamientos();
+  final HistorialMovimientos _historialMovimientos = HistorialMovimientos();
+  TiradaDados? _tiradaPendiente;
   final Map<(int, int), int> _valores = {};
   OpcionAncla? _opcionAnclaSeleccionada;
   Set<(int, int)> _destinosValidos = {};
@@ -116,10 +120,43 @@ class _TableroPageState extends State<TableroPage> {
     if (opcion == null || !_destinosValidos.contains((fila, columna))) return;
 
     if (_guardarNumero(fila, columna, opcion.numeroAColocar)) {
+      final tirada = _tiradaPendiente;
+      final zona = _crearTableroParaValidarAnclas().zonaEn(fila, columna);
+      final zonaCompletada = zona != null && zona.verificarCompletado()
+          ? zona
+          : null;
+
       setState(() {
         _tiradaConsumida = true;
+        if (_validadorInicio.jugando && tirada != null) {
+          _historialMovimientos.registrarJugada(
+            numeroTirada: tirada.numeroTirada,
+            ancla: opcion.ancla,
+            numeroColocado: opcion.numeroAColocar,
+            fila: fila,
+            columna: columna,
+            zonaCompletada: zonaCompletada,
+            puntosGanados: zonaCompletada?.puntosObtenidos ?? 0,
+          );
+        }
+        _tiradaPendiente = null;
       });
     }
+  }
+
+  void _saltarTurno() {
+    final tirada = _tiradaPendiente;
+    if (tirada == null) return;
+
+    setState(() {
+      _historialMovimientos.registrarSaltoTurno(
+        numeroTirada: tirada.numeroTirada,
+      );
+      _tiradaPendiente = null;
+      _tiradaConsumida = true;
+      _opcionAnclaSeleccionada = null;
+      _destinosValidos = {};
+    });
   }
 
   Future<void> _editarCelda(int fila, int columna) async {
@@ -215,6 +252,16 @@ class _TableroPageState extends State<TableroPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tableroActual = _crearTableroParaValidarAnclas();
+    final tiradaPendiente = _tiradaPendiente;
+    final puedeSaltarTurno =
+        _validadorInicio.jugando &&
+        tiradaPendiente != null &&
+        !ValidadorAnclas(tableroActual).hayMovimientosPosibles(
+          tiradaPendiente.primerDado,
+          tiradaPendiente.segundoDado,
+        );
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -241,7 +288,7 @@ class _TableroPageState extends State<TableroPage> {
                   ),
                   if (_validadorInicio.jugando) ...[
                     const SizedBox(height: 12),
-                    _construirMarcador(),
+                    _construirMarcador(tableroActual),
                   ],
                   const SizedBox(height: 20),
                   LayoutBuilder(
@@ -364,6 +411,8 @@ class _TableroPageState extends State<TableroPage> {
                               tiradaConsumida: _tiradaConsumida,
                               onAnclaSeleccionada: _seleccionarOpcionAncla,
                               onTirada: _registrarTirada,
+                              puedeSaltarTurno: puedeSaltarTurno,
+                              onSaltarTurno: _saltarTurno,
                               random: widget.random,
                             )
                           : null;
@@ -372,9 +421,17 @@ class _TableroPageState extends State<TableroPage> {
                               historial: _historialLanzamientos,
                             )
                           : null;
+                      final panelMovimientos = _validadorInicio.jugando
+                          ? PanelHistorialMovimientos(
+                              historial: _historialMovimientos,
+                              nombreDeZona: (idZona) =>
+                                  _nombreDeZona(tableroActual, idZona),
+                            )
+                          : null;
 
                       if (panelDados != null &&
                           panelHistorial != null &&
+                          panelMovimientos != null &&
                           constraints.maxWidth >= 850) {
                         return Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,7 +446,16 @@ class _TableroPageState extends State<TableroPage> {
                               ),
                             ),
                             const SizedBox(width: 20),
-                            SizedBox(width: 300, child: panelHistorial),
+                            SizedBox(
+                              width: 300,
+                              child: Column(
+                                children: [
+                                  panelHistorial,
+                                  const SizedBox(height: 16),
+                                  panelMovimientos,
+                                ],
+                              ),
+                            ),
                           ],
                         );
                       }
@@ -404,6 +470,10 @@ class _TableroPageState extends State<TableroPage> {
                           if (panelHistorial != null) ...[
                             const SizedBox(height: 16),
                             panelHistorial,
+                          ],
+                          if (panelMovimientos != null) ...[
+                            const SizedBox(height: 16),
+                            panelMovimientos,
                           ],
                         ],
                       );
@@ -439,12 +509,11 @@ class _TableroPageState extends State<TableroPage> {
 
   void _registrarTirada(List<int> valores) {
     setState(() {
-      _historialLanzamientos.registrar(valores);
+      _tiradaPendiente = _historialLanzamientos.registrar(valores);
     });
   }
 
-  Widget _construirMarcador() {
-    final tablero = _crearTableroParaValidarAnclas();
+  Widget _construirMarcador(Tablero tablero) {
     final puntuacionPorZona = tablero.puntuacionPorZona;
     return Card(
       key: const Key('scoreboard'),

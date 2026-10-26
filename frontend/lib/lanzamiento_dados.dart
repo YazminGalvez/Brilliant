@@ -11,6 +11,8 @@ class LanzamientoDados extends StatefulWidget {
     this.opcionSeleccionada,
     this.onAnclaSeleccionada,
     this.onTirada,
+    this.puedeSaltarTurno = false,
+    this.onSaltarTurno,
     this.random,
     super.key,
   });
@@ -20,6 +22,8 @@ class LanzamientoDados extends StatefulWidget {
   final OpcionAncla? opcionSeleccionada;
   final ValueChanged<OpcionAncla?>? onAnclaSeleccionada;
   final ValueChanged<List<int>>? onTirada;
+  final bool puedeSaltarTurno;
+  final VoidCallback? onSaltarTurno;
   final Random? random;
 
   @override
@@ -125,6 +129,8 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
         final widthPanelAnclas = constraints.maxWidth < 460
             ? constraints.maxWidth
             : 220.0;
+        final mostrarSaltarTurno =
+            widget.puedeSaltarTurno && !_controlador.isAnimating;
         final contenidoDados = Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -167,12 +173,36 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
               ],
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              key: const Key('roll-dice-button'),
-              onPressed: _controlador.isAnimating ? null : _lanzarDados,
-              icon: const Icon(Icons.casino),
-              label: const Text('Lanzar dados'),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  key: const Key('roll-dice-button'),
+                  onPressed: _controlador.isAnimating ? null : _lanzarDados,
+                  icon: const Icon(Icons.casino),
+                  label: const Text('Lanzar dados'),
+                ),
+                if (mostrarSaltarTurno)
+                  OutlinedButton(
+                    key: const Key('skip-turn-button'),
+                    onPressed: widget.onSaltarTurno,
+                    child: const Text('Saltar turno'),
+                  ),
+              ],
             ),
+            if (mostrarSaltarTurno) ...[
+              const SizedBox(height: 8),
+              Text(
+                'No hay movimientos posibles con esta tirada',
+                key: const Key('no-moves-message'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         );
 
