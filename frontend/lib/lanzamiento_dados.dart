@@ -73,7 +73,7 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
   }
 
   void _lanzarDados() {
-    if (_controlador.isAnimating) return;
+    if (_controlador.isAnimating || widget.puedeSaltarTurno) return;
 
     final resultados = _dados.lanzar();
     widget.onTirada?.call(resultados);
@@ -180,7 +180,10 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
               children: [
                 FilledButton.icon(
                   key: const Key('roll-dice-button'),
-                  onPressed: _controlador.isAnimating ? null : _lanzarDados,
+                  onPressed:
+                      _controlador.isAnimating || widget.puedeSaltarTurno
+                      ? null
+                      : _lanzarDados,
                   icon: const Icon(Icons.casino),
                   label: const Text('Lanzar dados'),
                 ),
@@ -195,7 +198,8 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
             if (mostrarSaltarTurno) ...[
               const SizedBox(height: 8),
               Text(
-                'No hay movimientos posibles con esta tirada',
+                'No hay movimientos posibles con esta tirada. '
+                'Salta el turno para volver a lanzar.',
                 key: const Key('no-moves-message'),
                 textAlign: TextAlign.center,
                 style: TextStyle(

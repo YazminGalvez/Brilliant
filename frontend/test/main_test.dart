@@ -392,6 +392,52 @@ void main() {
       findsNWidgets(2),
     );
   });
+
+  testWidgets('no deja lanzar de nuevo hasta saltar el turno sin jugadas', (
+    tester,
+  ) async {
+    await iniciarPartida(
+      tester,
+      _buscarSemillaParaTiradas([
+        [6, 1],
+        [6, 6],
+        [6, 6],
+      ]),
+    );
+    final botonLanzar = find.byKey(const Key('roll-dice-button'));
+    bool lanzarHabilitado() =>
+        tester.widget<FilledButton>(botonLanzar).onPressed != null;
+
+    await tocar(tester, botonLanzar);
+    await tocar(tester, find.byKey(const Key('anchor-option-6')));
+    await tocar(tester, find.byKey(const Key('cell-7-6')));
+
+    for (final numeroTirada in [2, 3]) {
+      await tocar(tester, botonLanzar);
+      expect(find.byKey(const Key('skip-turn-button')), findsOneWidget);
+      expect(lanzarHabilitado(), isFalse);
+
+      await tester.ensureVisible(botonLanzar);
+      await tester.tap(botonLanzar, warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(Key('dice-roll-history-item-${numeroTirada + 1}')),
+        findsNothing,
+      );
+
+      await tocar(tester, find.byKey(const Key('skip-turn-button')));
+      expect(lanzarHabilitado(), isTrue);
+      expect(
+        find.text('Tirada $numeroTirada: saltaste el turno'),
+        findsOneWidget,
+      );
+    }
+
+    expect(find.byKey(const Key('dice-roll-history-item-3')), findsOneWidget);
+    expect(find.byKey(const Key('dice-roll-history-item-4')), findsNothing);
+    expect(find.byKey(const Key('movement-history-item-3')), findsOneWidget);
+    expect(find.byKey(const Key('movement-history-item-4')), findsNothing);
+  });
 }
 
 int _buscarSemillaParaTiradas(List<List<int>> objetivo) {
