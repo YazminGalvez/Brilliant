@@ -1,4 +1,6 @@
 import 'package:test/test.dart';
+import 'package:juego_brilliant/color_zona.dart';
+import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/tablero.dart';
 import 'package:juego_brilliant/tipo.dart';
 import 'package:juego_brilliant/validador_inicio.dart';
@@ -264,6 +266,30 @@ void main() {
         () => tablero.agregarRegion(segunda),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('Zona de una celda', () {
+    test('Devuelve la zona que contiene la celda', () {
+      final tablero = mapaUno.crearTablero();
+
+      expect(tablero.zonaEn(0, 0)!.id, 0);
+      expect(tablero.zonaEn(0, 0)!.tipo.colorZona, ColorZona.amarillo);
+      expect(tablero.zonaEn(6, 6), same(tablero.zonaEn(0, 0)));
+      expect(tablero.zonaEn(0, 1)!.id, 1);
+      expect(tablero.zonaEn(0, 1)!.tipo.colorZona, ColorZona.verde);
+      expect(tablero.zonaEn(6, 5)!.tipo.colorZona, ColorZona.azul);
+    });
+
+    test('Devuelve null si ninguna zona contiene la celda', () {
+      expect(Tablero().zonaEn(3, 3), isNull);
+    });
+
+    test('Lanza RangeError fuera del tablero', () {
+      final tablero = mapaUno.crearTablero();
+
+      expect(() => tablero.zonaEn(7, 0), throwsRangeError);
+      expect(() => tablero.zonaEn(0, -1), throwsRangeError);
     });
   });
 }

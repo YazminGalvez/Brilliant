@@ -110,6 +110,20 @@ class Tablero {
     return datosExtraidos;
   }
 
+  Zona? zonaEn(int fila, int columna) {
+    obtenerCelda(fila, columna);
+
+    final zonas = _listaRegiones
+        .where((zona) => zona.contieneCoordenada(fila, columna))
+        .toList(growable: false);
+    if (zonas.length > 1) {
+      throw StateError(
+        'La celda ($fila, $columna) pertenece a más de una zona.',
+      );
+    }
+    return zonas.isEmpty ? null : zonas.single;
+  }
+
   void agregarRegion(Zona region) {
     for (var pos in region.coordenadas) {
       if (pos.fila < 0 ||

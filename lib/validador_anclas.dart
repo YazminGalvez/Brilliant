@@ -98,20 +98,18 @@ class ValidadorAnclas {
         .toList(growable: false);
   }
 
-  bool _cumpleReglaDeZona(int fila, int columna, int numero) {
-    final zonas = tablero.regiones
-        .where((zona) => zona.contieneCoordenada(fila, columna))
-        .toList(growable: false);
-
-    if (zonas.isEmpty) return false;
-    if (zonas.length > 1) {
-      throw StateError(
-        'La celda ($fila, $columna) pertenece a más de una zona.',
+  bool hayMovimientosPosibles(int dadoA, int dadoB) =>
+      obtenerOpciones(dadoA, dadoB).any(
+        (opcion) =>
+            opcion.puedeSeleccionarse &&
+            buscarDestinosValidos(
+              numeroAncla: opcion.ancla,
+              numeroDelOtroDado: opcion.numeroAColocar,
+            ).isNotEmpty,
       );
-    }
 
-    return zonas.single.validarNuevoMovimiento(numero);
-  }
+  bool _cumpleReglaDeZona(int fila, int columna, int numero) =>
+      tablero.zonaEn(fila, columna)?.validarNuevoMovimiento(numero) ?? false;
 
   bool _dentroDelTablero(int fila, int columna) =>
       fila >= 0 &&

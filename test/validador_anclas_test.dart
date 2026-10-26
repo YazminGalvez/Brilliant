@@ -307,6 +307,93 @@ void main() {
       );
     });
   });
+
+  group('Hay movimientos posibles', () {
+    test('es false si no hay números colocados', () {
+      expect(ValidadorAnclas(Tablero()).hayMovimientosPosibles(2, 5), isFalse);
+    });
+
+    test('es false si las vecinas del ancla están ocupadas o fuera', () {
+      final tablero = Tablero()
+        ..colocarDato(0, 0, 1)
+        ..colocarDato(0, 1, 4)
+        ..colocarDato(1, 0, 4);
+      _agregarZona(tablero, 1, TipoVerde(), [(0, 1), (1, 0)]);
+
+      expect(ValidadorAnclas(tablero).hayMovimientosPosibles(1, 3), isFalse);
+    });
+
+    test('es false si la única vecina libre viola la regla de su color', () {
+      final tablero = Tablero()
+        ..colocarDato(3, 3, 1)
+        ..colocarDato(2, 3, 5)
+        ..colocarDato(4, 3, 5)
+        ..colocarDato(3, 2, 5);
+      _agregarZona(tablero, 1, TipoAzul(), [(3, 4), (0, 0)]);
+      tablero.colocarDato(0, 0, 3);
+
+      expect(ValidadorAnclas(tablero).hayMovimientosPosibles(1, 4), isFalse);
+    });
+
+    test('es true si hay una vecina libre y válida', () {
+      final tablero = Tablero()
+        ..colocarDato(3, 3, 1)
+        ..colocarDato(2, 3, 5)
+        ..colocarDato(4, 3, 5)
+        ..colocarDato(3, 2, 5);
+      _agregarZona(tablero, 1, TipoAzul(), [(3, 4), (0, 0)]);
+      tablero.colocarDato(0, 0, 3);
+
+      expect(ValidadorAnclas(tablero).hayMovimientosPosibles(1, 3), isTrue);
+    });
+
+    test('es true si solo la segunda opción tiene jugada', () {
+      final tablero = Tablero()
+        ..colocarDato(6, 6, 2)
+        ..colocarDato(0, 0, 6);
+      _agregarZona(tablero, 1, TipoVerde(), [(1, 0)]);
+      final validador = ValidadorAnclas(tablero);
+
+      expect(
+        validador.obtenerOpciones(2, 6).map((o) => o.puedeSeleccionarse),
+        [true, true],
+      );
+      expect(
+        validador.buscarDestinosValidos(numeroAncla: 2, numeroDelOtroDado: 6),
+        isEmpty,
+      );
+      expect(validador.hayMovimientosPosibles(2, 6), isTrue);
+    });
+
+    test('funciona con dados dobles', () {
+      final tablero = Tablero()..colocarDato(0, 0, 3);
+      final validador = ValidadorAnclas(tablero);
+
+      expect(validador.hayMovimientosPosibles(3, 3), isFalse);
+
+      _agregarZona(tablero, 1, TipoVerde(), [(0, 1)]);
+      expect(validador.hayMovimientosPosibles(3, 3), isTrue);
+    });
+
+    test('rechaza dados fuera de 1 a 6', () {
+      final validador = ValidadorAnclas(Tablero());
+
+      expect(() => validador.hayMovimientosPosibles(0, 4), throwsArgumentError);
+      expect(() => validador.hayMovimientosPosibles(2, 7), throwsArgumentError);
+    });
+
+    test('no cambia el tablero', () {
+      final tablero = Tablero()
+        ..colocarDato(3, 3, 1)
+        ..colocarDato(0, 0, 3);
+      _agregarZona(tablero, 1, TipoAzul(), [(3, 4), (0, 0)]);
+      final antes = tablero.celdas.map((celda) => celda.valor).toList();
+
+      ValidadorAnclas(tablero).hayMovimientosPosibles(1, 3);
+
+      expect(tablero.celdas.map((celda) => celda.valor).toList(), antes);
+    });
+  });
 }
 
 void _agregarZona(
