@@ -2,18 +2,14 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:juego_brilliant/color_zona.dart';
-import 'package:juego_brilliant/historial_lanzamientos.dart';
-import 'package:juego_brilliant/historial_movimientos.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
-import 'package:juego_brilliant/tablero.dart';
+import 'package:juego_brilliant/partida.dart';
 import 'package:juego_brilliant/validador_anclas.dart';
-import 'package:juego_brilliant/validador_inicio.dart';
-import 'package:juego_brilliant/zona.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
 import 'package:frontend/panel_historial_movimientos.dart';
 
-Color colorDe(ColorZona color) => switch (color) {
+Color colorDeZona(ColorZona color) => switch (color) {
   ColorZona.amarillo => const Color(0xFFFEF3C7),
   ColorZona.verde => const Color(0xFFDCFCE7),
   ColorZona.azul => const Color(0xFFDBEAFE),
@@ -26,7 +22,10 @@ void main() {
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+  const MainApp({this.partida, this.random, super.key});
+
+  final Partida? partida;
+  final Random? random;
 
   @override
   Widget build(BuildContext context) {
@@ -37,14 +36,15 @@ class MainApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF4F5F1),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3D6657)),
       ),
-      home: const TableroPage(),
+      home: TableroPage(partida: partida, random: random),
     );
   }
 }
 
 class TableroPage extends StatefulWidget {
-  const TableroPage({this.random, super.key});
+  const TableroPage({this.partida, this.random, super.key});
 
+  final Partida? partida;
   final Random? random;
 
   @override
@@ -52,66 +52,84 @@ class TableroPage extends StatefulWidget {
 }
 
 class _TableroPageState extends State<TableroPage> {
-  final ValidadorInicio _validadorInicio = ValidadorInicio();
-  final HistorialLanzamientos _historialLanzamientos =
-      HistorialLanzamientos();
-  final HistorialMovimientos _historialMovimientos = HistorialMovimientos();
-  TiradaDados? _tiradaPendiente;
-  final Map<(int, int), int> _valores = {};
+  late final Partida _partida;
   OpcionAncla? _opcionAnclaSeleccionada;
-  Set<(int, int)> _destinosValidos = {};
-  bool _tiradaConsumida = false;
 
-  List<int?> get _valoresIniciales => [
-    for (final coordenada in ValidadorInicio.celdasIniciales)
-      _valores[coordenada],
+  @override
+  void initState() {
+    super.initState();
+    _partida = widget.partida ?? Partida(mapa: mapaUno);
+  }
+
+  bool get _preparando => _partida.estado == EstadoPartida.preparando;
+  bool get _jugando => _partida.estado == EstadoPartida.jugando;
+
+  List<(int, int)> get _celdasIniciales => [
+    for (final (fila, columna) in _partida.mapa.celdasIniciales)
+      (fila - 1, columna - 1),
   ];
 
-  void _actualizarEstadoInicial() {
-    _validadorInicio.actualizarValoresIniciales(_valoresIniciales);
+  List<OpcionAncla> get _opcionesVisibles {
+    if (_partida.tiradaActual != null) return _partida.opcionesAncla;
+
+    final ultima = _partida.historialLanzamientos.ultima;
+    if (ultima == null || !_jugando) return const [];
+    return [
+      OpcionAncla(
+        ancla: ultima.primerDado,
+        numeroAColocar: ultima.segundoDado,
+        puedeSeleccionarse: false,
+      ),
+      if (ultima.primerDado != ultima.segundoDado)
+        OpcionAncla(
+          ancla: ultima.segundoDado,
+          numeroAColocar: ultima.primerDado,
+          puedeSeleccionarse: false,
+        ),
+    ];
+  }
+
+  Set<(int, int)> get _destinosValidos {
+    final opcion = _opcionAnclaSeleccionada;
+    if (opcion == null || _partida.tiradaActual == null) return const {};
+    return {
+      for (final destino in _partida.destinosValidos(opcion))
+        (destino.fila, destino.columna),
+    };
   }
 
   void _iniciarPartida() {
-    if (!_validadorInicio.puedeIniciar) return;
-    setState(_validadorInicio.iniciarPartida);
+    if (!_partida.puedeIniciar) return;
+    setState(_partida.iniciar);
   }
 
-  Tablero _crearTableroParaValidarAnclas() {
-    final tablero = mapaUno.crearTablero();
-
-    for (var fila = 0; fila < Tablero.cantidadFilas; fila++) {
-      for (var columna = 0; columna < Tablero.cantidadColumnas; columna++) {
-        tablero.colocarDato(fila, columna, _valores[(fila + 1, columna + 1)]);
-      }
-    }
-
-    return tablero;
+  void _nuevaPartida() {
+    setState(() {
+      _partida.reiniciar();
+      _opcionAnclaSeleccionada = null;
+    });
   }
 
-  Zona _zonaDe(Tablero tablero, int fila, int columna) => tablero.regiones
-      .firstWhere((zona) => zona.contieneCoordenada(fila, columna));
+  void _registrarTirada(List<int> valores) {
+    setState(() {
+      _partida.registrarTirada(valores);
+    });
+  }
 
   void _seleccionarOpcionAncla(OpcionAncla? opcion) {
-    if (opcion == null || !opcion.puedeSeleccionarse) {
-      setState(() {
-        _opcionAnclaSeleccionada = null;
-        _destinosValidos = {};
-        _tiradaConsumida = false;
-      });
-      return;
-    }
+    setState(() {
+      _opcionAnclaSeleccionada = opcion != null && opcion.puedeSeleccionarse
+          ? opcion
+          : null;
+    });
+  }
 
-    final validador = ValidadorAnclas(_crearTableroParaValidarAnclas());
-    final destinos = validador.buscarDestinosValidos(
-      numeroAncla: opcion.ancla,
-      numeroDelOtroDado: opcion.numeroAColocar,
-    );
+  void _saltarTurno() {
+    if (!_partida.puedeSaltarTurno) return;
 
     setState(() {
-      _opcionAnclaSeleccionada = opcion;
-      _destinosValidos = {
-        for (final destino in destinos) (destino.fila, destino.columna),
-      };
+      _partida.saltarTurno();
+      _opcionAnclaSeleccionada = null;
     });
   }
 
@@ -119,81 +137,31 @@ class _TableroPageState extends State<TableroPage> {
     final opcion = _opcionAnclaSeleccionada;
     if (opcion == null || !_destinosValidos.contains((fila, columna))) return;
 
-    if (_guardarNumero(fila, columna, opcion.numeroAColocar)) {
-      final tirada = _tiradaPendiente;
-      final zona = _crearTableroParaValidarAnclas().zonaEn(fila, columna);
-      final zonaCompletada = zona != null && zona.verificarCompletado()
-          ? zona
-          : null;
-
-      setState(() {
-        _tiradaConsumida = true;
-        if (_validadorInicio.jugando && tirada != null) {
-          _historialMovimientos.registrarJugada(
-            numeroTirada: tirada.numeroTirada,
-            ancla: opcion.ancla,
-            numeroColocado: opcion.numeroAColocar,
-            fila: fila,
-            columna: columna,
-            zonaCompletada: zonaCompletada,
-            puntosGanados: zonaCompletada?.puntosObtenidos ?? 0,
-          );
-        }
-        _tiradaPendiente = null;
-      });
-    }
-  }
-
-  void _saltarTurno() {
-    final tirada = _tiradaPendiente;
-    if (tirada == null) return;
-
     setState(() {
-      _historialMovimientos.registrarSaltoTurno(
-        numeroTirada: tirada.numeroTirada,
-      );
-      _tiradaPendiente = null;
-      _tiradaConsumida = true;
+      _partida.colocar(opcion, fila, columna);
       _opcionAnclaSeleccionada = null;
-      _destinosValidos = {};
     });
   }
 
-  Future<void> _editarCelda(int fila, int columna) async {
-    if (_destinosValidos.contains((fila, columna)) &&
-        _opcionAnclaSeleccionada != null) {
-      _confirmarMovimiento(fila, columna);
-      return;
-    }
+  Future<void> _editarCeldaInicial(int fila, int columna) async {
+    final indice = _celdasIniciales.indexOf((fila, columna));
+    if (!_preparando || indice < 0) return;
 
-    if (_validadorInicio.jugando) return;
-
-    final coordenada = (fila + 1, columna + 1);
-    final esCeldaInicial = ValidadorInicio.celdasIniciales.contains(coordenada);
-
-    if (_validadorInicio.jugando == esCeldaInicial) return;
-
-    final valorActual = _valores[coordenada];
-    final numerosDisponibles = esCeldaInicial
-        ? {
-            for (final entrada in _valores.entries)
-              if (ValidadorInicio.celdasIniciales.contains(entrada.key) &&
-                  entrada.key != coordenada)
-                entrada.value,
-          }
-        : <int>{};
+    final valoresIniciales = _partida.valoresIniciales;
+    final valorActual = valoresIniciales[indice];
+    final numerosUsados = {
+      for (var otro = 0; otro < valoresIniciales.length; otro++)
+        if (otro != indice && valoresIniciales[otro] != null)
+          valoresIniciales[otro]!,
+    };
 
     final valor = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text(
-          esCeldaInicial
-              ? 'Número inicial ${ValidadorInicio.celdasIniciales.indexOf(coordenada) + 1}'
-              : 'Fila ${fila + 1}, columna ${columna + 1}',
-        ),
+        title: Text('Número inicial ${indice + 1}'),
         children: [
           for (var numero = 1; numero <= 6; numero++)
-            if (!numerosDisponibles.contains(numero) || numero == valorActual)
+            if (!numerosUsados.contains(numero) || numero == valorActual)
               SimpleDialogOption(
                 onPressed: () => Navigator.pop(context, numero),
                 child: Text('$numero'),
@@ -209,58 +177,26 @@ class _TableroPageState extends State<TableroPage> {
 
     if (valor == null || !mounted) return;
 
-    if (valor == 0) {
-      setState(() {
-        _valores.remove(coordenada);
-        if (esCeldaInicial) _actualizarEstadoInicial();
-        _opcionAnclaSeleccionada = null;
-        _destinosValidos = {};
-      });
-      return;
-    }
-
-    _guardarNumero(fila, columna, valor);
+    setState(() {
+      _partida.colocarValorInicial(fila, columna, valor == 0 ? null : valor);
+    });
   }
 
-  bool _guardarNumero(int fila, int columna, int valor) {
-    final zona = _zonaDe(_crearTableroParaValidarAnclas(), fila, columna);
-    final valoresZona = <int>[
-      for (final celda in zona.coordenadas)
-        if ((celda.fila != fila || celda.columna != columna) &&
-            celda.valor != null)
-          celda.valor!,
-    ];
-    final tipo = zona.tipo;
-
-    if (!tipo.esPosibleAgregar(valoresZona, valor)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Regla de la zona: ${tipo.descripcion}')),
-      );
-      return false;
+  VoidCallback? _accionDeCelda(int fila, int columna, bool esCeldaInicial) {
+    if (_preparando) {
+      return esCeldaInicial ? () => _editarCeldaInicial(fila, columna) : null;
     }
-
-    setState(() {
-      _valores[(fila + 1, columna + 1)] = valor;
-      if (ValidadorInicio.celdasIniciales.contains((fila + 1, columna + 1))) {
-        _actualizarEstadoInicial();
-      }
-      _opcionAnclaSeleccionada = null;
-      _destinosValidos = {};
-    });
-    return true;
+    if (_jugando && !esCeldaInicial) {
+      return () => _confirmarMovimiento(fila, columna);
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final tableroActual = _crearTableroParaValidarAnclas();
-    final tiradaPendiente = _tiradaPendiente;
-    final puedeSaltarTurno =
-        _validadorInicio.jugando &&
-        tiradaPendiente != null &&
-        !ValidadorAnclas(tableroActual).hayMovimientosPosibles(
-          tiradaPendiente.primerDado,
-          tiradaPendiente.segundoDado,
-        );
+    final enCurso = !_preparando;
+    final celdasIniciales = _celdasIniciales.toSet();
+    final destinosValidos = _destinosValidos;
 
     return Scaffold(
       body: SafeArea(
@@ -278,17 +214,24 @@ class _TableroPageState extends State<TableroPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _validadorInicio.jugando
-                        ? 'Partida en curso'
-                        : 'Ingresa los números iniciales del 1 al 6',
+                    switch (_partida.estado) {
+                      EstadoPartida.preparando =>
+                        'Ingresa los números iniciales del 1 al 6',
+                      EstadoPartida.jugando => 'Partida en curso',
+                      EstadoPartida.terminada => 'Fin del juego',
+                    },
                     style: TextStyle(
                       fontSize: 15,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  if (_validadorInicio.jugando) ...[
+                  if (enCurso) ...[
                     const SizedBox(height: 12),
-                    _construirMarcador(tableroActual),
+                    _construirMarcador(),
+                  ],
+                  if (_partida.terminada) ...[
+                    const SizedBox(height: 12),
+                    _construirFinDePartida(),
                   ],
                   const SizedBox(height: 20),
                   LayoutBuilder(
@@ -308,37 +251,35 @@ class _TableroPageState extends State<TableroPage> {
                               itemBuilder: (context, index) {
                                 final fila = index ~/ 7;
                                 final columna = index % 7;
-                                final color = mapaUno.colorEn(fila, columna);
-                                final coordenada = (fila + 1, columna + 1);
-                                final valor = _valores[coordenada];
-                                final esDestinoValido = _destinosValidos
+                                final color = _partida.mapa.colorEn(
+                                  fila,
+                                  columna,
+                                );
+                                final valor = _partida.tablero
+                                    .obtenerCelda(fila, columna)
+                                    .valor;
+                                final esDestinoValido = destinosValidos
                                     .contains((fila, columna));
-                                final esCeldaInicial = ValidadorInicio
-                                    .celdasIniciales
-                                    .contains(coordenada);
+                                final esCeldaInicial = celdasIniciales
+                                    .contains((fila, columna));
 
                                 return Padding(
                                   padding: const EdgeInsets.all(2),
                                   child: Material(
                                     color: esDestinoValido
                                         ? const Color(0xFFBBF7D0)
-                                        : colorDe(color),
+                                        : colorDeZona(color),
                                     borderRadius: BorderRadius.circular(4),
                                     clipBehavior: Clip.antiAlias,
                                     child: InkWell(
                                       key: Key(
                                         'cell-${fila + 1}-${columna + 1}',
                                       ),
-                                      onTap: _validadorInicio.jugando
-                                          ? esCeldaInicial
-                                                ? null
-                                                : () => _editarCelda(
-                                                    fila,
-                                                    columna,
-                                                  )
-                                          : esCeldaInicial
-                                          ? () => _editarCelda(fila, columna)
-                                          : null,
+                                      onTap: _accionDeCelda(
+                                        fila,
+                                        columna,
+                                        esCeldaInicial,
+                                      ),
                                       child: Container(
                                         decoration: BoxDecoration(
                                           border: Border.all(
@@ -404,28 +345,27 @@ class _TableroPageState extends State<TableroPage> {
                           ),
                         ),
                       );
-                      final panelDados = _validadorInicio.jugando
+                      final panelDados = enCurso
                           ? LanzamientoDados(
-                              valoresPresentes: _valores.values.toSet(),
+                              opciones: _opcionesVisibles,
+                              puedeLanzar: _partida.puedeLanzar,
                               opcionSeleccionada: _opcionAnclaSeleccionada,
-                              tiradaConsumida: _tiradaConsumida,
                               onAnclaSeleccionada: _seleccionarOpcionAncla,
                               onTirada: _registrarTirada,
-                              puedeSaltarTurno: puedeSaltarTurno,
+                              puedeSaltarTurno: _partida.puedeSaltarTurno,
                               onSaltarTurno: _saltarTurno,
                               random: widget.random,
                             )
                           : null;
-                      final panelHistorial = _validadorInicio.jugando
+                      final panelHistorial = enCurso
                           ? PanelHistorialLanzamientos(
-                              historial: _historialLanzamientos,
+                              historial: _partida.historialLanzamientos,
                             )
                           : null;
-                      final panelMovimientos = _validadorInicio.jugando
+                      final panelMovimientos = enCurso
                           ? PanelHistorialMovimientos(
-                              historial: _historialMovimientos,
-                              nombreDeZona: (idZona) =>
-                                  _nombreDeZona(tableroActual, idZona),
+                              historial: _partida.historialMovimientos,
+                              nombreDeZona: _nombreDeZona,
                             )
                           : null;
 
@@ -479,18 +419,18 @@ class _TableroPageState extends State<TableroPage> {
                       );
                     },
                   ),
-                  if (!_validadorInicio.jugando) ...[
+                  if (_preparando) ...[
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
                         key: const Key('start-game'),
-                        onPressed: _validadorInicio.puedeIniciar
+                        onPressed: _partida.puedeIniciar
                             ? _iniciarPartida
                             : null,
                         child: const Text('Inicio'),
                       ),
                     ),
-                    if (!_validadorInicio.puedeIniciar)
+                    if (!_partida.puedeIniciar)
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
                         child: Text(
@@ -507,14 +447,8 @@ class _TableroPageState extends State<TableroPage> {
     );
   }
 
-  void _registrarTirada(List<int> valores) {
-    setState(() {
-      _tiradaPendiente = _historialLanzamientos.registrar(valores);
-    });
-  }
-
-  Widget _construirMarcador(Tablero tablero) {
-    final puntuacionPorZona = tablero.puntuacionPorZona;
+  Widget _construirMarcador() {
+    final puntuacionPorZona = _partida.puntuacionPorZona;
     return Card(
       key: const Key('scoreboard'),
       child: Padding(
@@ -523,7 +457,7 @@ class _TableroPageState extends State<TableroPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Puntuación total: ${tablero.puntuacionTotal}',
+              'Puntuación total: ${_partida.puntuacionTotal}',
               key: const Key('total-score'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
@@ -532,7 +466,7 @@ class _TableroPageState extends State<TableroPage> {
               for (final MapEntry(key: idZona, value: puntos)
                   in puntuacionPorZona.entries)
                 Text(
-                  'Zona ${_nombreDeZona(tablero, idZona)} ${idZona + 1}: '
+                  'Zona ${_nombreDeZona(idZona)} ${idZona + 1}: '
                   '$puntos puntos',
                   key: Key('zone-score-$idZona'),
                 ),
@@ -543,6 +477,38 @@ class _TableroPageState extends State<TableroPage> {
     );
   }
 
-  String _nombreDeZona(Tablero tablero, int idZona) =>
-      tablero.regiones.firstWhere((zona) => zona.id == idZona).tipo.nombre;
+  Widget _construirFinDePartida() {
+    return Card(
+      key: const Key('game-over-panel'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Partida terminada',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Puntuación final: ${_partida.puntuacionTotal} de '
+              '${_partida.puntuacionMaxima}',
+              key: const Key('final-score'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              key: const Key('new-game-button'),
+              onPressed: _nuevaPartida,
+              child: const Text('Nueva partida'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _nombreDeZona(int idZona) => _partida.tablero.regiones
+      .firstWhere((zona) => zona.id == idZona)
+      .tipo
+      .nombre;
 }

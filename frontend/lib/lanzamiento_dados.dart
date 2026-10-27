@@ -6,8 +6,8 @@ import 'package:juego_brilliant/validador_anclas.dart';
 
 class LanzamientoDados extends StatefulWidget {
   const LanzamientoDados({
-    required this.valoresPresentes,
-    this.tiradaConsumida = false,
+    this.opciones = const [],
+    this.puedeLanzar = true,
     this.opcionSeleccionada,
     this.onAnclaSeleccionada,
     this.onTirada,
@@ -17,8 +17,8 @@ class LanzamientoDados extends StatefulWidget {
     super.key,
   });
 
-  final Set<int> valoresPresentes;
-  final bool tiradaConsumida;
+  final List<OpcionAncla> opciones;
+  final bool puedeLanzar;
   final OpcionAncla? opcionSeleccionada;
   final ValueChanged<OpcionAncla?>? onAnclaSeleccionada;
   final ValueChanged<List<int>>? onTirada;
@@ -73,7 +73,7 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
   }
 
   void _lanzarDados() {
-    if (_controlador.isAnimating || widget.puedeSaltarTurno) return;
+    if (_controlador.isAnimating || !widget.puedeLanzar) return;
 
     final resultados = _dados.lanzar();
     widget.onTirada?.call(resultados);
@@ -87,30 +87,6 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
   void _seleccionarOpcion(OpcionAncla opcion) {
     if (!opcion.puedeSeleccionarse) return;
     widget.onAnclaSeleccionada?.call(opcion);
-  }
-
-  List<OpcionAncla> get _opcionesAncla {
-    if (_resultados.any((resultado) => resultado == null)) return const [];
-
-    final primero = _resultados[0]!;
-    final segundo = _resultados[1]!;
-    return [
-      OpcionAncla(
-        ancla: primero,
-        numeroAColocar: segundo,
-        puedeSeleccionarse:
-            !widget.tiradaConsumida &&
-            widget.valoresPresentes.contains(primero),
-      ),
-      if (primero != segundo)
-        OpcionAncla(
-          ancla: segundo,
-          numeroAColocar: primero,
-          puedeSeleccionarse:
-              !widget.tiradaConsumida &&
-              widget.valoresPresentes.contains(segundo),
-        ),
-    ];
   }
 
   @override
@@ -181,7 +157,7 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
                 FilledButton.icon(
                   key: const Key('roll-dice-button'),
                   onPressed:
-                      _controlador.isAnimating || widget.puedeSaltarTurno
+                      _controlador.isAnimating || !widget.puedeLanzar
                       ? null
                       : _lanzarDados,
                   icon: const Icon(Icons.casino),
@@ -210,7 +186,7 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
           ],
         );
 
-        final opciones = _opcionesAncla;
+        final opciones = widget.opciones;
         final panelAnclas = opciones.isEmpty
             ? const SizedBox.shrink()
             : _PanelOpcionesAncla(

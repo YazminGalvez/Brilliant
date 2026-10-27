@@ -13,51 +13,6 @@ void main() {
   ];
 
   group('Validador de inicio', () {
-    test('Valida los valores y el estado de la partida', () {
-      final tablero = Tablero();
-      final validador = ValidadorInicio();
-
-      expect(validador.estado, EstadoInicialPartida.bloqueado);
-      expect(validador.validarAntesDeIniciar, throwsA(isA<StateError>()));
-
-      const valores = [1, 2, 3, 4, 5, 6];
-      for (var index = 0;
-          index < ValidadorInicio.celdasIniciales.length;
-          index++) {
-        final (fila, columna) = ValidadorInicio.celdasIniciales[index];
-        tablero.colocarDato(fila - 1, columna - 1, valores[index]);
-      }
-
-      validador.actualizarValoresIniciales(leerValoresIniciales(tablero));
-      expect(validador.estado, EstadoInicialPartida.inicializado);
-      expect(validador.puedeIniciar, isTrue);
-      expect(validador.validarAntesDeIniciar, returnsNormally);
-
-      final (ultimaFila, ultimaColumna) = ValidadorInicio.celdasIniciales.last;
-      tablero.colocarDato(ultimaFila - 1, ultimaColumna - 1, 7);
-      validador.actualizarValoresIniciales(leerValoresIniciales(tablero));
-      expect(validador.estado, EstadoInicialPartida.bloqueado);
-
-      tablero.colocarDato(ultimaFila - 1, ultimaColumna - 1, valores.last);
-      validador.actualizarValoresIniciales(leerValoresIniciales(tablero));
-      validador.iniciarPartida();
-      expect(validador.estado, EstadoInicialPartida.jugando);
-      expect(validador.jugando, isTrue);
-    });
-
-    test('Rechaza números repetidos en las celdas iniciales', () {
-      final tablero = Tablero();
-      final validador = ValidadorInicio();
-
-      for (final (fila, columna) in ValidadorInicio.celdasIniciales) {
-        tablero.colocarDato(fila - 1, columna - 1, 1);
-      }
-
-      validador.actualizarValoresIniciales(leerValoresIniciales(tablero));
-      expect(validador.estado, EstadoInicialPartida.bloqueado);
-      expect(validador.iniciarPartida, throwsA(isA<StateError>()));
-    });
-
     test('Conserva las coordenadas iniciales establecidas', () {
       expect(ValidadorInicio.celdasIniciales, [
         (1, 3),

@@ -7,11 +7,7 @@ void main() {
   testWidgets('muestra las opciones deshabilitadas si no hay anclas', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: LanzamientoDados(valoresPresentes: {})),
-      ),
-    );
+    await tester.pumpWidget(const _Anfitrion(valoresPresentes: {}));
 
     expect(find.byKey(const Key('anchor-options-panel')), findsNothing);
 
@@ -32,14 +28,7 @@ void main() {
     OpcionAncla? seleccionada;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: LanzamientoDados(
-            valoresPresentes: {1, 2, 3, 4, 5, 6},
-            onAnclaSeleccionada: (opcion) => seleccionada = opcion,
-          ),
-        ),
-      ),
+      _Anfitrion(onAnclaSeleccionada: (opcion) => seleccionada = opcion),
     );
 
     await tester.tap(find.byKey(const Key('roll-dice-button')));
@@ -58,16 +47,7 @@ void main() {
   testWidgets('no ofrece saltar turno si hay movimientos posibles', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: LanzamientoDados(
-            valoresPresentes: {1, 2, 3, 4, 5, 6},
-            puedeSaltarTurno: false,
-          ),
-        ),
-      ),
-    );
+    await tester.pumpWidget(const _Anfitrion());
 
     await tester.tap(find.byKey(const Key('roll-dice-button')));
     await tester.pumpAndSettle();
@@ -82,7 +62,7 @@ void main() {
     var saltos = 0;
 
     await tester.pumpWidget(
-      _AnfitrionSinJugadas(onSaltarTurno: () => saltos++),
+      _Anfitrion(sinJugadas: true, onSaltarTurno: () => saltos++),
     );
 
     await tester.tap(find.byKey(const Key('roll-dice-button')));
@@ -120,7 +100,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: LanzamientoDados(
-            valoresPresentes: const {1, 2, 3, 4, 5, 6},
+            puedeLanzar: false,
             puedeSaltarTurno: true,
             onTirada: (_) => tiradas++,
           ),
@@ -148,10 +128,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: LanzamientoDados(
-            valoresPresentes: const {1, 2, 3, 4, 5, 6},
-            onTirada: (_) => tiradas++,
-          ),
+          body: LanzamientoDados(onTirada: (_) => tiradas++),
         ),
       ),
     );
@@ -169,7 +146,7 @@ void main() {
     var tiradas = 0;
 
     await tester.pumpWidget(
-      _AnfitrionSinJugadas(onTirada: () => tiradas++),
+      _Anfitrion(sinJugadas: true, onTirada: () => tiradas++),
     );
 
     await tester.tap(find.byKey(const Key('roll-dice-button')));
@@ -191,20 +168,53 @@ void main() {
     expect(find.byKey(const Key('skip-turn-button')), findsNothing);
     expect(botonLanzar(tester).onPressed, isNotNull);
   });
+
+  testWidgets('deshabilita lanzar si el padre no lo permite', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: LanzamientoDados(puedeLanzar: false)),
+      ),
+    );
+
+    expect(botonLanzar(tester).onPressed, isNull);
+    expect(find.byKey(const Key('skip-turn-button')), findsNothing);
+  });
 }
 
-class _AnfitrionSinJugadas extends StatefulWidget {
-  const _AnfitrionSinJugadas({this.onTirada, this.onSaltarTurno});
+class _Anfitrion extends StatefulWidget {
+  const _Anfitrion({
+    this.valoresPresentes = const {1, 2, 3, 4, 5, 6},
+    this.sinJugadas = false,
+    this.onTirada,
+    this.onSaltarTurno,
+    this.onAnclaSeleccionada,
+  });
 
+  final Set<int> valoresPresentes;
+  final bool sinJugadas;
   final VoidCallback? onTirada;
   final VoidCallback? onSaltarTurno;
+  final ValueChanged<OpcionAncla?>? onAnclaSeleccionada;
 
   @override
-  State<_AnfitrionSinJugadas> createState() => _AnfitrionSinJugadasState();
+  State<_Anfitrion> createState() => _AnfitrionState();
 }
 
-class _AnfitrionSinJugadasState extends State<_AnfitrionSinJugadas> {
+class _AnfitrionState extends State<_Anfitrion> {
+  List<OpcionAncla> _opciones = const [];
   bool _puedeSaltarTurno = false;
+
+  List<OpcionAncla> _opcionesDe(List<int> valores) => [
+    for (final (ancla, otro) in [
+      (valores[0], valores[1]),
+      if (valores[0] != valores[1]) (valores[1], valores[0]),
+    ])
+      OpcionAncla(
+        ancla: ancla,
+        numeroAColocar: otro,
+        puedeSeleccionarse: widget.valoresPresentes.contains(ancla),
+      ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -213,11 +223,16 @@ class _AnfitrionSinJugadasState extends State<_AnfitrionSinJugadas> {
         body: SizedBox(
           width: 330,
           child: LanzamientoDados(
-            valoresPresentes: const {1, 2, 3, 4, 5, 6},
+            opciones: _opciones,
+            puedeLanzar: !_puedeSaltarTurno,
             puedeSaltarTurno: _puedeSaltarTurno,
-            onTirada: (_) {
+            onAnclaSeleccionada: widget.onAnclaSeleccionada,
+            onTirada: (valores) {
               widget.onTirada?.call();
-              setState(() => _puedeSaltarTurno = true);
+              setState(() {
+                _opciones = _opcionesDe(valores);
+                _puedeSaltarTurno = widget.sinJugadas;
+              });
             },
             onSaltarTurno: () {
               widget.onSaltarTurno?.call();
