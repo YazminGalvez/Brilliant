@@ -292,4 +292,73 @@ void main() {
       expect(() => tablero.zonaEn(0, -1), throwsRangeError);
     });
   });
+
+  group('Celdas iniciales inyectadas', () {
+    test('Usa las celdas iniciales recibidas', () {
+      final tablero = Tablero(
+        celdasIniciales: const [(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6)],
+      );
+
+      tablero.establecerValoresIniciales([1, 2, 3, 4, 5, 6]);
+
+      expect(tablero.inicializado, isTrue);
+      expect(
+        [
+          for (var columna = 0; columna < 6; columna++)
+            tablero.obtenerCelda(0, columna).valor,
+        ],
+        [1, 2, 3, 4, 5, 6],
+      );
+    });
+
+    test('Sin celdas usa las del profesor', () {
+      expect(Tablero().celdasIniciales, ValidadorInicio.celdasIniciales);
+    });
+
+    test('Rechaza celdas iniciales inválidas', () {
+      expect(
+        () => Tablero(
+          celdasIniciales: const [(1, 1), (1, 2), (1, 3), (1, 4), (1, 5)],
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => Tablero(
+          celdasIniciales: const [
+            (1, 1),
+            (1, 1),
+            (1, 3),
+            (1, 4),
+            (1, 5),
+            (1, 6),
+          ],
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => Tablero(
+          celdasIniciales: const [
+            (0, 1),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (1, 5),
+            (1, 6),
+          ],
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('estaLleno solo es true con todas las celdas con valor', () {
+      final tablero = Tablero();
+      for (final celda in tablero.celdas) {
+        celda.valor = 1;
+      }
+      expect(tablero.estaLleno, isTrue);
+
+      tablero.colocarDato(3, 3, null);
+      expect(tablero.estaLleno, isFalse);
+    });
+  });
 }

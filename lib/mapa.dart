@@ -24,5 +24,6 @@ abstract class Mapa {
   Tablero crearTablero() => ConstructorTablero(
     colores: colores,
     coloresUnidos: coloresUnidos,
+    celdasIniciales: celdasIniciales,
   ).construir();
 }

@@ -12,8 +12,13 @@ import 'zona.dart';
 class ConstructorTablero {
   final List<List<ColorZona>> colores;
   final Set<ColorZona> coloresUnidos;
+  final List<(int, int)>? celdasIniciales;
 
-  ConstructorTablero({required this.colores, this.coloresUnidos = const {}}) {
+  ConstructorTablero({
+    required this.colores,
+    this.coloresUnidos = const {},
+    this.celdasIniciales,
+  }) {
     if (colores.length != Tablero.cantidadFilas ||
         colores.any((fila) => fila.length != Tablero.cantidadColumnas)) {
       throw ArgumentError(
@@ -24,7 +29,7 @@ class ConstructorTablero {
   }
 
   Tablero construir() {
-    final tablero = Tablero();
+    final tablero = Tablero(celdasIniciales: celdasIniciales);
     final asignadas = List.generate(
       Tablero.cantidadFilas,
       (_) => List.filled(Tablero.cantidadColumnas, false),

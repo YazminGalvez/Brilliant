@@ -7,15 +7,36 @@ class Tablero {
 
   final List<List<Coordenada>> _matrizCeldas;
   final List<Zona> _listaRegiones = [];
+  final List<(int, int)> celdasIniciales;
 
-  Tablero()
-    : _matrizCeldas = List.generate(
+  Tablero({List<(int, int)>? celdasIniciales})
+    : celdasIniciales = List.unmodifiable(
+        celdasIniciales ?? ValidadorInicio.celdasIniciales,
+      ),
+      _matrizCeldas = List.generate(
         cantidadFilas,
         (f) => List.generate(
           cantidadColumnas,
           (c) => Coordenada(fila: f, columna: c),
         ),
+      ) {
+    final distintas = this.celdasIniciales.toSet();
+    if (this.celdasIniciales.length != 6 ||
+        distintas.length != 6 ||
+        distintas.any(
+          (celda) =>
+              celda.$1 < 1 ||
+              celda.$1 > cantidadFilas ||
+              celda.$2 < 1 ||
+              celda.$2 > cantidadColumnas,
+        )) {
+      throw ArgumentError.value(
+        celdasIniciales,
+        'celdasIniciales',
+        'Deben ser 6 celdas distintas dentro del tablero, contando desde 1.',
       );
+    }
+  }
 
   List<Zona> get regiones => List.unmodifiable(_listaRegiones);
 
@@ -66,9 +87,11 @@ class Tablero {
     obtenerCelda(fila, columna).valor = valor;
   }
 
-  // Celdas de ValidadorInicio.celdasIniciales (base 1) convertidas a base 0.
+  bool get estaLleno => celdas.every((celda) => celda.valor != null);
+
+  // Celdas de celdasIniciales (base 1) convertidas a base 0.
   List<Coordenada> get _celdasIniciales => [
-    for (final (fila, columna) in ValidadorInicio.celdasIniciales)
+    for (final (fila, columna) in celdasIniciales)
       obtenerCelda(fila - 1, columna - 1),
   ];
 
