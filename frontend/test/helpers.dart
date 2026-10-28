@@ -138,3 +138,18 @@ Future<void> elegirAncla(WidgetTester tester, int ancla) =>
 
 Future<void> tocarDestino(WidgetTester tester, int fila, int columna) =>
     tocar(tester, find.byKey(Key('cell-$fila-$columna')));
+
+Future<void> ingresarNumerosIniciales(
+  WidgetTester tester, {
+  int cantidad = 6,
+}) async {
+  final celdas = mapaUno.celdasIniciales;
+  for (var index = 0; index < cantidad; index++) {
+    await ingresarNumeroInicial(tester, celdas[index], index + 1);
+  }
+}
+
+Future<void> vaciarCeldaInicial(WidgetTester tester, (int, int) celda) async {
+  await tocar(tester, find.byKey(Key('cell-${celda.$1}-${celda.$2}')));
+  await tocar(tester, find.text('Vaciar celda'));
+}
