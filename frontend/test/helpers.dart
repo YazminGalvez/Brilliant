@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/main.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/dados.dart';
 import 'package:juego_brilliant/mapa.dart';
@@ -85,3 +86,55 @@ Future<void> ingresarNumeroInicial(
   await tester.tap(find.text('$numero').last);
   await tester.pumpAndSettle();
 }
+
+class DadosFijos implements Random {
+  DadosFijos(List<int> valores) : _valores = List.of(valores);
+
+  final List<int> _valores;
+  var _indice = 0;
+
+  @override
+  int nextInt(int max) {
+    if (_indice >= _valores.length) {
+      throw StateError('DadosFijos no tiene más valores para lanzar.');
+    }
+    final valor = _valores[_indice++];
+    if (valor < 1 || valor > max) {
+      throw RangeError.range(valor, 1, max, 'valor del dado');
+    }
+    return valor - 1;
+  }
+
+  @override
+  double nextDouble() =>
+      throw UnsupportedError('DadosFijos solo sirve para lanzar dados.');
+
+  @override
+  bool nextBool() =>
+      throw UnsupportedError('DadosFijos solo sirve para lanzar dados.');
+}
+
+Future<void> abrirPartida(
+  WidgetTester tester,
+  Partida partida, {
+  Random? random,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: TableroPage(partida: partida, random: random),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> abrirPantallaNueva(WidgetTester tester, {Random? random}) =>
+    abrirPartida(tester, Partida(mapa: mapaUno), random: random);
+
+Future<void> lanzarDados(WidgetTester tester) =>
+    tocar(tester, find.byKey(const Key('roll-dice-button')));
+
+Future<void> elegirAncla(WidgetTester tester, int ancla) =>
+    tocar(tester, find.byKey(Key('anchor-option-$ancla')));
+
+Future<void> tocarDestino(WidgetTester tester, int fila, int columna) =>
+    tocar(tester, find.byKey(Key('cell-$fila-$columna')));
