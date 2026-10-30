@@ -13,4 +13,6 @@ enum ColorZona {
 
   /// Todos los números de la zona deben ser distintos.
   rojo,
+
+  gris,
 }

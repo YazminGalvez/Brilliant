@@ -16,6 +16,7 @@ Color colorDeZona(ColorZona color) => switch (color) {
   ColorZona.azul => const Color(0xFFDBEAFE),
   ColorZona.morado => const Color(0xFFF3E8FF),
   ColorZona.rojo => const Color(0xFFFEE2E2),
+  ColorZona.gris => const Color(0xFFE5E7EB),
 };
 
 void main() {

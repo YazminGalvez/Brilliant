@@ -16,6 +16,7 @@ abstract class Tipo {
     ColorZona.azul => TipoAzul(),
     ColorZona.morado => TipoMorado(),
     ColorZona.rojo => TipoRojo(),
+    ColorZona.gris => TipoGris(),
   };
 
   Color get color;
@@ -166,5 +167,31 @@ class TipoAmarillo extends Tipo {
         1: 8,
         2: 6,
         3: 4,
+      };
+}
+
+class TipoGris extends Tipo {
+  @override
+  ColorZona get colorZona => ColorZona.gris;
+
+  @override
+  Color get color => const Color(0xFF9E9E9E);
+
+  @override
+  String get nombre => 'Gris';
+
+  @override
+  String get descripcion => 'Todos los números grises deben ser iguales';
+
+  @override
+  bool esPosibleAgregar(List<int> actuales, int posible) {
+    return actuales.isEmpty || actuales.every((element) => element == posible);
+  }
+
+  @override
+  Map<int, int> get puntuaciones => {
+        1: 3,
+        2: 2,
+        3: 1,
       };
 }
