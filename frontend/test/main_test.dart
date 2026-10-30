@@ -25,7 +25,7 @@ void main() {
   }
 
   testWidgets('Los números iniciales fueron agregados', (tester) async {
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(const MaterialApp(home: TableroPage()));
 
     for (var index = 0; index < coordenadasIniciales.length; index++) {
       await ingresarNumero(tester, coordenadasIniciales[index], index + 1);
@@ -44,7 +44,7 @@ void main() {
   });
 
   testWidgets('Los números iniciales no se repitieron', (tester) async {
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(const MaterialApp(home: TableroPage()));
     await ingresarNumero(tester, coordenadasIniciales.first, 1);
 
     final siguienteCasilla = coordenadasIniciales[1];
@@ -62,7 +62,7 @@ void main() {
   testWidgets('Los números iniciales están en las coordenadas correctas', (
     tester,
   ) async {
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(const MaterialApp(home: TableroPage()));
 
     for (var fila = 1; fila <= 7; fila++) {
       for (var columna = 1; columna <= 7; columna++) {
@@ -86,7 +86,7 @@ void main() {
   testWidgets(
     'Inicio se habilita al completar los valores y cambia a jugando',
     (tester) async {
-      await tester.pumpWidget(const MainApp());
+      await tester.pumpWidget(const MaterialApp(home: TableroPage()));
 
       FilledButton botonInicio() =>
           tester.widget<FilledButton>(find.byKey(const Key('start-game')));
@@ -127,7 +127,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(const MainApp());
+      await tester.pumpWidget(const MaterialApp(home: TableroPage()));
 
       for (var index = 0; index < coordenadasIniciales.length; index++) {
         await ingresarNumero(tester, coordenadasIniciales[index], index + 1);

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/main.dart';
+import 'package:frontend/seleccion_mapa.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/dados.dart';
 import 'package:juego_brilliant/mapa.dart';
@@ -152,4 +153,15 @@ Future<void> ingresarNumerosIniciales(
 Future<void> vaciarCeldaInicial(WidgetTester tester, (int, int) celda) async {
   await tocar(tester, find.byKey(Key('cell-${celda.$1}-${celda.$2}')));
   await tocar(tester, find.text('Vaciar celda'));
+}
+
+Future<void> abrirMenuDeMapas(WidgetTester tester, {Random? random}) async {
+  await tester.pumpWidget(MaterialApp(home: SeleccionMapaPage(random: random)));
+  await tester.pumpAndSettle();
+}
+
+void usarTamanoDePantalla(WidgetTester tester, Size tamano) {
+  tester.view.physicalSize = tamano;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
 }

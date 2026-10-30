@@ -8,6 +8,7 @@ import 'package:juego_brilliant/validador_anclas.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
 import 'package:frontend/panel_historial_movimientos.dart';
+import 'package:frontend/seleccion_mapa.dart';
 
 Color colorDeZona(ColorZona color) => switch (color) {
   ColorZona.amarillo => const Color(0xFFFEF3C7),
@@ -36,7 +37,9 @@ class MainApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF4F5F1),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3D6657)),
       ),
-      home: TableroPage(partida: partida, random: random),
+      home: partida == null
+          ? SeleccionMapaPage(random: random)
+          : TableroPage(partida: partida, random: random),
     );
   }
 }
@@ -108,6 +111,19 @@ class _TableroPageState extends State<TableroPage> {
       _partida.reiniciar();
       _opcionAnclaSeleccionada = null;
     });
+  }
+
+  void _cambiarDeMapa() {
+    final navegador = Navigator.of(context);
+    if (navegador.canPop()) {
+      navegador.pop();
+      return;
+    }
+    navegador.pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => SeleccionMapaPage(random: widget.random),
+      ),
+    );
   }
 
   void _registrarTirada(List<int> valores) {
@@ -208,9 +224,24 @@ class _TableroPageState extends State<TableroPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Brilliant',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Brilliant',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        key: const Key('change-map-button'),
+                        onPressed: _cambiarDeMapa,
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Cambiar de mapa'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -260,8 +291,9 @@ class _TableroPageState extends State<TableroPage> {
                                     .valor;
                                 final esDestinoValido = destinosValidos
                                     .contains((fila, columna));
-                                final esCeldaInicial = celdasIniciales
-                                    .contains((fila, columna));
+                                final esCeldaInicial = celdasIniciales.contains(
+                                  (fila, columna),
+                                );
 
                                 return Padding(
                                   padding: const EdgeInsets.all(2),
