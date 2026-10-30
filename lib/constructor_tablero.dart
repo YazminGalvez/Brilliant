@@ -13,11 +13,13 @@ class ConstructorTablero {
   final List<List<ColorZona>> colores;
   final Set<ColorZona> coloresUnidos;
   final List<(int, int)>? celdasIniciales;
+  final Tipo Function(ColorZona color)? crearTipo;
 
   ConstructorTablero({
     required this.colores,
     this.coloresUnidos = const {},
     this.celdasIniciales,
+    this.crearTipo,
   }) {
     if (colores.length != Tablero.cantidadFilas ||
         colores.any((fila) => fila.length != Tablero.cantidadColumnas)) {
@@ -54,7 +56,7 @@ class ConstructorTablero {
         tablero.agregarRegion(
           Zona(
             id: siguienteId++,
-            tipo: Tipo.deColor(color),
+            tipo: crearTipo?.call(color) ?? Tipo.deColor(color),
             coordenadas: [
               for (final (filaZona, columnaZona) in posiciones)
                 tablero.obtenerCelda(filaZona, columnaZona),

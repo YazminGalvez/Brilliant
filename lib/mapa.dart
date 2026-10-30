@@ -1,6 +1,7 @@
 import 'color_zona.dart';
 import 'constructor_tablero.dart';
 import 'tablero.dart';
+import 'tipo.dart';
 
 /// Describe un mapa del juego: el color de cada celda y las celdas iniciales.
 /// El tablero con sus zonas lo arma [ConstructorTablero].
@@ -21,9 +22,12 @@ abstract class Mapa {
   /// Color de la celda en (fila, columna), contando desde 0.
   ColorZona colorEn(int fila, int columna) => colores[fila][columna];
 
+  Tipo crearTipo(ColorZona color) => Tipo.deColor(color);
+
   Tablero crearTablero() => ConstructorTablero(
     colores: colores,
     coloresUnidos: coloresUnidos,
     celdasIniciales: celdasIniciales,
+    crearTipo: crearTipo,
   ).construir();
 }

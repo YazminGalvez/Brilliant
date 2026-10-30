@@ -8,23 +8,30 @@ class Color {
 }
 
 abstract class Tipo {
-  Tipo();
+  Tipo({this.primerLugar});
 
-  factory Tipo.deColor(ColorZona color) => switch (color) {
-    ColorZona.amarillo => TipoAmarillo(),
-    ColorZona.verde => TipoVerde(),
-    ColorZona.azul => TipoAzul(),
-    ColorZona.morado => TipoMorado(),
-    ColorZona.rojo => TipoRojo(),
-    ColorZona.gris => TipoGris(),
+  factory Tipo.deColor(ColorZona color, {int? primerLugar}) => switch (color) {
+    ColorZona.amarillo => TipoAmarillo(primerLugar: primerLugar),
+    ColorZona.verde => TipoVerde(primerLugar: primerLugar),
+    ColorZona.azul => TipoAzul(primerLugar: primerLugar),
+    ColorZona.morado => TipoMorado(primerLugar: primerLugar),
+    ColorZona.rojo => TipoRojo(primerLugar: primerLugar),
+    ColorZona.gris => TipoGris(primerLugar: primerLugar),
   };
+
+  final int? primerLugar;
 
   Color get color;
   ColorZona get colorZona;
   String get nombre;
   String get descripcion;
   bool esPosibleAgregar(List<int> actuales, int posible);
-  Map<int, int> get puntuaciones;
+  Map<int, int> get puntuacionesPorDefecto;
+
+  Map<int, int> get puntuaciones => {
+    ...puntuacionesPorDefecto,
+    1: ?primerLugar,
+  };
 
   int calcularPuntuacion([int posicion = 1]) {
     final puntos = puntuaciones[posicion];
@@ -40,6 +47,8 @@ abstract class Tipo {
 }
 
 class TipoAzul extends Tipo {
+  TipoAzul({super.primerLugar});
+
   @override
   ColorZona get colorZona => ColorZona.azul;
 
@@ -58,7 +67,7 @@ class TipoAzul extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuaciones => {
+  Map<int, int> get puntuacionesPorDefecto => {
         1: 7,
         2: 5,
         3: 3,
@@ -66,6 +75,8 @@ class TipoAzul extends Tipo {
 }
 
 class TipoRojo extends Tipo {
+  TipoRojo({super.primerLugar});
+
   @override
   ColorZona get colorZona => ColorZona.rojo;
 
@@ -84,7 +95,7 @@ class TipoRojo extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuaciones => {
+  Map<int, int> get puntuacionesPorDefecto => {
         1: 6,
         2: 4,
         3: 2,
@@ -92,6 +103,8 @@ class TipoRojo extends Tipo {
 }
 
 class TipoVerde extends Tipo {
+  TipoVerde({super.primerLugar});
+
   @override
   ColorZona get colorZona => ColorZona.verde;
 
@@ -110,7 +123,7 @@ class TipoVerde extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuaciones => {
+  Map<int, int> get puntuacionesPorDefecto => {
         1: 4,
         2: 3,
         3: 2,
@@ -118,6 +131,8 @@ class TipoVerde extends Tipo {
 }
 
 class TipoMorado extends Tipo {
+  TipoMorado({super.primerLugar});
+
   @override
   ColorZona get colorZona => ColorZona.morado;
 
@@ -137,7 +152,7 @@ class TipoMorado extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuaciones => {
+  Map<int, int> get puntuacionesPorDefecto => {
         1: 6,
         2: 4,
         3: 2,
@@ -145,6 +160,8 @@ class TipoMorado extends Tipo {
 }
 
 class TipoAmarillo extends Tipo {
+  TipoAmarillo({super.primerLugar});
+
   @override
   ColorZona get colorZona => ColorZona.amarillo;
 
@@ -163,7 +180,7 @@ class TipoAmarillo extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuaciones => {
+  Map<int, int> get puntuacionesPorDefecto => {
         1: 8,
         2: 6,
         3: 4,
@@ -171,6 +188,8 @@ class TipoAmarillo extends Tipo {
 }
 
 class TipoGris extends Tipo {
+  TipoGris({super.primerLugar});
+
   @override
   ColorZona get colorZona => ColorZona.gris;
 
@@ -189,7 +208,7 @@ class TipoGris extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuaciones => {
+  Map<int, int> get puntuacionesPorDefecto => {
         1: 3,
         2: 2,
         3: 1,

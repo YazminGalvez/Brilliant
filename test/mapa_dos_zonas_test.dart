@@ -182,4 +182,73 @@ void main() {
       ]);
     });
   });
+
+  group('Mapa 2: reglas y puntos', () {
+    late Tablero tablero;
+
+    setUp(() {
+      tablero = mapaDos.crearTablero();
+    });
+
+    int primerLugarDe(ColorZona color) => tablero.regiones
+        .firstWhere((zona) => zona.tipo.colorZona == color)
+        .tipo
+        .calcularPuntuacion(1);
+
+    test('Cada color da los puntos del primer lugar del Mapa 2', () {
+      expect(primerLugarDe(ColorZona.amarillo), 6);
+      expect(primerLugarDe(ColorZona.morado), 6);
+      expect(primerLugarDe(ColorZona.rojo), 6);
+      expect(primerLugarDe(ColorZona.azul), 7);
+      expect(primerLugarDe(ColorZona.verde), 4);
+      expect(primerLugarDe(ColorZona.gris), 3);
+    });
+
+    test('Las dos zonas del mismo color dan los mismos puntos', () {
+      for (final zona in tablero.regiones) {
+        expect(
+          zona.tipo.calcularPuntuacion(1),
+          mapaDos.crearTipo(zona.tipo.colorZona).calcularPuntuacion(1),
+          reason: 'zona ${zona.id}',
+        );
+      }
+    });
+
+    test('El amarillo del Mapa 2 conserva los puntos de 2.º y 3.er lugar', () {
+      final amarilla = tablero.zonaEn(1, 1)!.tipo;
+
+      expect(amarilla.puntuaciones, {1: 6, 2: 6, 3: 4});
+    });
+
+    test('La puntuación máxima del Mapa 2 es 55', () {
+      expect(tablero.puntuacionMaxima, 55);
+    });
+
+    test('La zona gris acepta en su otra celda el mismo número', () {
+      tablero.colocarDato(0, 3, 2);
+
+      expect(tablero.zonaEn(6, 3)!.validarNuevoMovimiento(2), isTrue);
+    });
+
+    test('La zona gris rechaza en su otra celda un número distinto', () {
+      tablero.colocarDato(0, 3, 2);
+
+      expect(tablero.zonaEn(6, 3)!.validarNuevoMovimiento(5), isFalse);
+    });
+
+    test('La zona amarilla acepta en otra celda separada un número nuevo', () {
+      tablero.colocarDato(1, 1, 4);
+
+      expect(tablero.zonaEn(5, 5)!.validarNuevoMovimiento(3), isTrue);
+    });
+
+    test(
+      'La zona amarilla rechaza en otra celda separada un número repetido',
+      () {
+        tablero.colocarDato(1, 1, 4);
+
+        expect(tablero.zonaEn(5, 5)!.validarNuevoMovimiento(4), isFalse);
+      },
+    );
+  });
 }

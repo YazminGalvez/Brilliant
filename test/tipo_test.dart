@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import 'package:juego_brilliant/tipo.dart';
+import 'package:juego_brilliant/color_zona.dart';
 
 void main() {
   group('Pruebas de colores', () {
@@ -136,6 +137,20 @@ void main() {
     test('Rojo', () {
       expect(TipoRojo().nombre, 'Roja');
       expect(TipoRojo().descripcion, 'Todos los números deben ser distintos');
+    });
+  });
+
+  group('Puntos propios del primer lugar', () {
+    test('Sin primerLugar se usan los puntos por defecto', () {
+      expect(Tipo.deColor(ColorZona.amarillo).puntuaciones, {1: 8, 2: 6, 3: 4});
+    });
+
+    test('Con primerLugar cambia solo el 1er lugar', () {
+      final azul = Tipo.deColor(ColorZona.azul, primerLugar: 9);
+
+      expect(azul, isA<TipoAzul>());
+      expect(azul.puntuaciones, {1: 9, 2: 5, 3: 3});
+      expect(azul.calcularPuntuacion(), 9);
     });
   });
 }
