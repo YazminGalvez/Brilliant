@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/seleccion_mapa.dart';
+import 'package:juego_brilliant/mapa_dos.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 
 import '../helpers.dart';
@@ -13,8 +14,10 @@ void main() {
 
     Finder opcion(int numero) => find.byKey(Key('map-option-$numero'));
 
-    Finder celdaDeVista(int indice) =>
-        find.byKey(Key('map-preview-cell-$indice'));
+    Finder celdaDeVista(int indice, [int mapa = 1]) => find.descendant(
+      of: opcion(mapa),
+      matching: find.byKey(Key('map-preview-cell-$indice')),
+    );
 
     Finder celdasDeVistaEn(Finder tarjeta) => find.descendant(
       of: tarjeta,
@@ -27,8 +30,12 @@ void main() {
       ),
     );
 
-    Color? colorDeCeldaDeVista(WidgetTester tester, int indice) =>
-        (tester.widget<Container>(celdaDeVista(indice)).decoration
+    Color? colorDeCeldaDeVista(
+      WidgetTester tester,
+      int indice, [
+      int mapa = 1,
+    ]) =>
+        (tester.widget<Container>(celdaDeVista(indice, mapa)).decoration
                 as BoxDecoration)
             .color;
 
@@ -124,11 +131,27 @@ void main() {
     );
 
     testWidgets(
-      'El Mapa 2 aparece próximamente con candado y sin vista previa',
+      'El Mapa 2 aparece disponible con una vista previa de 49 celdas con sus colores',
       (tester) async {
         await abrirMenuDeMapas(tester);
 
-        comprobarMapaBloqueado(tester, 2);
+        expect(
+          find.descendant(of: opcion(2), matching: find.text('Disponible')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: opcion(2), matching: find.text('Próximamente')),
+          findsNothing,
+        );
+        expect(tester.widget<InkWell>(opcion(2)).onTap, isNotNull);
+        expect(celdasDeVistaEn(opcion(2)), findsNWidgets(49));
+        for (var indice = 0; indice < 49; indice++) {
+          expect(
+            colorDeCeldaDeVista(tester, indice, 2),
+            colorDeZona(mapaDos.colorEn(indice ~/ 7, indice % 7)),
+            reason: 'celda $indice',
+          );
+        }
       },
     );
 
@@ -151,11 +174,12 @@ void main() {
     );
 
     testWidgets(
-      'La lista del menú tiene cuatro mapas y solo el primero está habilitado',
+      'La lista del menú tiene cuatro mapas y solo los dos primeros están habilitados',
       (tester) async {
         expect(mapasDelMenu, hasLength(4));
         expect(mapasDelMenu.first, same(mapaUno));
-        expect(mapasDelMenu.skip(1), everyElement(isNull));
+        expect(mapasDelMenu[1], same(mapaDos));
+        expect(mapasDelMenu.skip(2), everyElement(isNull));
       },
     );
 
@@ -178,10 +202,34 @@ void main() {
       },
     );
 
+    testWidgets(
+      'Tocar el Mapa 2 abre el tablero con las celdas iniciales del Mapa 2',
+      (tester) async {
+        await abrirAplicacion(tester);
+
+        await tocar(tester, opcion(2));
+
+        expect(find.byType(TableroPage), findsOneWidget);
+        expect(botonInicio, findsOneWidget);
+        expect(textoMenu, findsNothing);
+        expect(find.text('+'), findsNWidgets(6));
+        for (final (fila, columna) in mapaDos.celdasIniciales) {
+          expect(
+            find.descendant(
+              of: find.byKey(Key('cell-$fila-$columna')),
+              matching: find.text('+'),
+            ),
+            findsOneWidget,
+            reason: 'celda ($fila, $columna)',
+          );
+        }
+      },
+    );
+
     testWidgets('Tocar un mapa bloqueado no abre nada', (tester) async {
       await abrirAplicacion(tester);
 
-      await tocar(tester, opcion(2));
+      await tocar(tester, opcion(3));
 
       expect(find.byType(SeleccionMapaPage), findsOneWidget);
       expect(find.byType(TableroPage), findsNothing);
@@ -196,7 +244,7 @@ void main() {
         await abrirMenuDeMapas(tester);
 
         expect(find.bySemanticsLabel('Mapa 1, disponible'), findsOneWidget);
-        expect(find.bySemanticsLabel('Mapa 2, bloqueado'), findsOneWidget);
+        expect(find.bySemanticsLabel('Mapa 2, disponible'), findsOneWidget);
         expect(find.bySemanticsLabel('Mapa 3, bloqueado'), findsOneWidget);
         expect(find.bySemanticsLabel('Mapa 4, bloqueado'), findsOneWidget);
         semantica.dispose();
