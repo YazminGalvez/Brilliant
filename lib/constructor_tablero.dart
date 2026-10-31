@@ -14,12 +14,14 @@ class ConstructorTablero {
   final Set<ColorZona> coloresUnidos;
   final List<(int, int)>? celdasIniciales;
   final Tipo Function(ColorZona color)? crearTipo;
+  final List<List<(int, int)>> partesUnidas;
 
   ConstructorTablero({
     required this.colores,
     this.coloresUnidos = const {},
     this.celdasIniciales,
     this.crearTipo,
+    this.partesUnidas = const [],
   }) {
     if (colores.length != Tablero.cantidadFilas ||
         colores.any((fila) => fila.length != Tablero.cantidadColumnas)) {
@@ -28,7 +30,44 @@ class ConstructorTablero {
         '${Tablero.cantidadFilas}x${Tablero.cantidadColumnas}.',
       );
     }
+    for (final grupo in partesUnidas) {
+      _validarParteUnida(grupo);
+    }
   }
+
+  void _validarParteUnida(List<(int, int)> grupo) {
+    if (grupo.length < 2) {
+      throw ArgumentError.value(
+        grupo,
+        'partesUnidas',
+        'Cada grupo debe tener al menos 2 celdas.',
+      );
+    }
+    for (final (fila, columna) in grupo) {
+      if (!_dentroDelTablero(fila, columna)) {
+        throw ArgumentError.value(
+          grupo,
+          'partesUnidas',
+          'La celda ($fila, $columna) está fuera del tablero.',
+        );
+      }
+    }
+    final (filaInicial, columnaInicial) = grupo.first;
+    final color = colores[filaInicial][columnaInicial];
+    if (grupo.any((celda) => colores[celda.$1][celda.$2] != color)) {
+      throw ArgumentError.value(
+        grupo,
+        'partesUnidas',
+        'Todas las celdas del grupo deben ser del mismo color.',
+      );
+    }
+  }
+
+  bool _dentroDelTablero(int fila, int columna) =>
+      fila >= 0 &&
+      fila < Tablero.cantidadFilas &&
+      columna >= 0 &&
+      columna < Tablero.cantidadColumnas;
 
   Tablero construir() {
     final tablero = Tablero(celdasIniciales: celdasIniciales);
@@ -45,7 +84,7 @@ class ConstructorTablero {
         final color = colores[fila][columna];
         final posiciones = coloresUnidos.contains(color)
             ? _celdasDelColor(color)
-            : _celdasVecinas(fila, columna);
+            : _celdasConPartesUnidas(fila, columna);
         posiciones.sort(
           (a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2),
         );
@@ -74,6 +113,23 @@ class ConstructorTablero {
       for (var columna = 0; columna < Tablero.cantidadColumnas; columna++)
         if (colores[fila][columna] == color) (fila, columna),
   ];
+
+  List<(int, int)> _celdasConPartesUnidas(int fila, int columna) {
+    final encontradas = _celdasVecinas(fila, columna).toSet();
+    var huboCambios = true;
+    while (huboCambios) {
+      huboCambios = false;
+      for (final grupo in partesUnidas) {
+        if (!grupo.any(encontradas.contains)) continue;
+        for (final (filaParte, columnaParte) in grupo) {
+          if (encontradas.contains((filaParte, columnaParte))) continue;
+          encontradas.addAll(_celdasVecinas(filaParte, columnaParte));
+          huboCambios = true;
+        }
+      }
+    }
+    return encontradas.toList();
+  }
 
   List<(int, int)> _celdasVecinas(int fila, int columna) {
     final color = colores[fila][columna];

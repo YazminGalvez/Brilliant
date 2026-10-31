@@ -22,6 +22,8 @@ abstract class Mapa {
   /// Color de la celda en (fila, columna), contando desde 0.
   ColorZona colorEn(int fila, int columna) => colores[fila][columna];
 
+  List<List<(int, int)>> get partesUnidas => const [];
+
   Tipo crearTipo(ColorZona color) => Tipo.deColor(color);
 
   Tablero crearTablero() => ConstructorTablero(
@@ -29,5 +31,9 @@ abstract class Mapa {
     coloresUnidos: coloresUnidos,
     celdasIniciales: celdasIniciales,
     crearTipo: crearTipo,
+    partesUnidas: [
+      for (final grupo in partesUnidas)
+        [for (final (fila, columna) in grupo) (fila - 1, columna - 1)],
+    ],
   ).construir();
 }
