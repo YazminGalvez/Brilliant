@@ -1,5 +1,6 @@
 import 'color_zona.dart';
 import 'mapa.dart';
+import 'tipo.dart';
 import 'validador_inicio.dart';
 
 const mapaTres = MapaTres();
@@ -53,4 +54,17 @@ class MapaTres extends Mapa {
   List<List<(int, int)>> get partesUnidas => const [
     [(7, 1), (7, 5)],
   ];
+
+  @override
+  Tipo crearTipo(ColorZona color) => Tipo.deColor(
+    color,
+    primerLugar: switch (color) {
+      ColorZona.amarillo => 7,
+      ColorZona.morado => 7,
+      ColorZona.rojo => 6,
+      ColorZona.azul => 7,
+      ColorZona.gris => 8,
+      ColorZona.verde => 6,
+    },
+  );
 }

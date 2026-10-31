@@ -188,4 +188,94 @@ void main() {
       expect(verde.tamanoZona, 9);
     });
   });
+
+  group('Mapa 3: reglas y puntos', () {
+    late Tablero tablero;
+
+    setUp(() {
+      tablero = mapaTres.crearTablero();
+    });
+
+    int primerLugarDe(ColorZona color) => tablero.regiones
+        .firstWhere((zona) => zona.tipo.colorZona == color)
+        .tipo
+        .calcularPuntuacion(1);
+
+    test('Cada color da los puntos del primer lugar del Mapa 3', () {
+      expect(primerLugarDe(ColorZona.amarillo), 7);
+      expect(primerLugarDe(ColorZona.morado), 7);
+      expect(primerLugarDe(ColorZona.rojo), 6);
+      expect(primerLugarDe(ColorZona.azul), 7);
+      expect(primerLugarDe(ColorZona.gris), 8);
+      expect(primerLugarDe(ColorZona.verde), 6);
+    });
+
+    test('Las dos zonas del mismo color dan los mismos puntos', () {
+      for (final zona in tablero.regiones) {
+        expect(
+          zona.tipo.calcularPuntuacion(1),
+          mapaTres.crearTipo(zona.tipo.colorZona).calcularPuntuacion(1),
+          reason: 'zona ${zona.id}',
+        );
+      }
+    });
+
+    test('La puntuación máxima del Mapa 3 es 54', () {
+      expect(tablero.puntuacionMaxima, 54);
+    });
+
+    test('La zona gris acepta en otra celda separada el mismo número', () {
+      tablero.colocarDato(0, 3, 2);
+
+      expect(tablero.zonaEn(6, 3)!.validarNuevoMovimiento(2), isTrue);
+    });
+
+    test('La zona gris rechaza en otra celda separada un número distinto', () {
+      tablero.colocarDato(0, 3, 2);
+
+      expect(tablero.zonaEn(6, 3)!.validarNuevoMovimiento(5), isFalse);
+    });
+
+    test('La zona amarilla acepta en la otra esquina un número nuevo', () {
+      tablero.colocarDato(0, 0, 3);
+
+      expect(tablero.zonaEn(1, 5)!.validarNuevoMovimiento(4), isTrue);
+    });
+
+    test('La zona amarilla rechaza en la otra esquina un número repetido', () {
+      tablero.colocarDato(0, 0, 3);
+
+      expect(tablero.zonaEn(1, 5)!.validarNuevoMovimiento(3), isFalse);
+    });
+
+    test(
+      'El morado de abajo acepta en un pedazo un número del otro pedazo',
+      () {
+        tablero.colocarDato(6, 0, 1);
+        tablero.colocarDato(6, 1, 2);
+
+        expect(tablero.zonaEn(6, 6)!.validarNuevoMovimiento(1), isTrue);
+      },
+    );
+
+    test(
+      'El morado de abajo rechaza un tercer número aunque esté en el otro pedazo',
+      () {
+        tablero.colocarDato(6, 0, 1);
+        tablero.colocarDato(6, 1, 2);
+
+        expect(tablero.zonaEn(6, 6)!.validarNuevoMovimiento(3), isFalse);
+      },
+    );
+
+    test(
+      'El morado de arriba no se ve afectado por los números del de abajo',
+      () {
+        tablero.colocarDato(6, 0, 1);
+        tablero.colocarDato(6, 1, 2);
+
+        expect(tablero.zonaEn(1, 3)!.validarNuevoMovimiento(3), isTrue);
+      },
+    );
+  });
 }
