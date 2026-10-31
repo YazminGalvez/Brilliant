@@ -66,6 +66,7 @@ class MapaDos extends Mapa {
       ColorZona.azul => 7,
       ColorZona.verde => 4,
       ColorZona.gris => 3,
+      ColorZona.naranja => null,
     },
   );
 }

@@ -15,4 +15,6 @@ enum ColorZona {
   rojo,
 
   gris,
+
+  naranja,
 }

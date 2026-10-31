@@ -17,6 +17,7 @@ abstract class Tipo {
     ColorZona.morado => TipoMorado(primerLugar: primerLugar),
     ColorZona.rojo => TipoRojo(primerLugar: primerLugar),
     ColorZona.gris => TipoGris(primerLugar: primerLugar),
+    ColorZona.naranja => TipoNaranja(primerLugar: primerLugar),
   };
 
   final int? primerLugar;
@@ -212,5 +213,44 @@ class TipoGris extends Tipo {
         1: 3,
         2: 2,
         3: 1,
+      };
+}
+
+class TipoNaranja extends Tipo {
+  TipoNaranja({this.minimo = 1, this.maximo = 6, super.primerLugar}) {
+    if (minimo < 1 || maximo > 6 || minimo > maximo) {
+      throw ArgumentError(
+        'El rango naranja debe estar entre 1 y 6 con minimo <= maximo: '
+        '$minimo a $maximo.',
+      );
+    }
+  }
+
+  final int minimo;
+  final int maximo;
+
+  @override
+  ColorZona get colorZona => ColorZona.naranja;
+
+  @override
+  Color get color => const Color(0xFFFF9800);
+
+  @override
+  String get nombre => 'Naranja';
+
+  @override
+  String get descripcion =>
+      'Solo números del $minimo al $maximo; pueden repetirse';
+
+  @override
+  bool esPosibleAgregar(List<int> actuales, int posible) {
+    return posible >= minimo && posible <= maximo;
+  }
+
+  @override
+  Map<int, int> get puntuacionesPorDefecto => {
+        1: 6,
+        2: 4,
+        3: 3,
       };
 }

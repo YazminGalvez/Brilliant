@@ -3,10 +3,10 @@ import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/tipo.dart';
 
 void main() {
-  test('El enum tiene exactamente los 6 colores de zona', () {
+  test('El enum tiene exactamente los 7 colores de zona', () {
     expect(
       ColorZona.values.map((color) => color.name),
-      ['amarillo', 'verde', 'azul', 'morado', 'rojo', 'gris'],
+      ['amarillo', 'verde', 'azul', 'morado', 'rojo', 'gris', 'naranja'],
     );
   });
 

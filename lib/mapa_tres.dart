@@ -71,6 +71,7 @@ class MapaTres extends Mapa {
       ColorZona.azul => 7,
       ColorZona.gris => 8,
       ColorZona.verde => 6,
+      ColorZona.naranja => null,
     },
   );
 }
