@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/seleccion_mapa.dart';
 import 'package:juego_brilliant/mapa_dos.dart';
+import 'package:juego_brilliant/mapa_tres.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 
 import '../helpers.dart';
@@ -156,11 +157,27 @@ void main() {
     );
 
     testWidgets(
-      'El Mapa 3 aparece próximamente con candado y sin vista previa',
+      'El Mapa 3 aparece disponible con una vista previa de 49 celdas con sus colores',
       (tester) async {
         await abrirMenuDeMapas(tester);
 
-        comprobarMapaBloqueado(tester, 3);
+        expect(
+          find.descendant(of: opcion(3), matching: find.text('Disponible')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: opcion(3), matching: find.text('Próximamente')),
+          findsNothing,
+        );
+        expect(tester.widget<InkWell>(opcion(3)).onTap, isNotNull);
+        expect(celdasDeVistaEn(opcion(3)), findsNWidgets(49));
+        for (var indice = 0; indice < 49; indice++) {
+          expect(
+            colorDeCeldaDeVista(tester, indice, 3),
+            colorDeZona(mapaTres.colorEn(indice ~/ 7, indice % 7)),
+            reason: 'celda $indice',
+          );
+        }
       },
     );
 
@@ -174,12 +191,13 @@ void main() {
     );
 
     testWidgets(
-      'La lista del menú tiene cuatro mapas y solo los dos primeros están habilitados',
+      'La lista del menú tiene cuatro mapas y solo los tres primeros están habilitados',
       (tester) async {
         expect(mapasDelMenu, hasLength(4));
         expect(mapasDelMenu.first, same(mapaUno));
         expect(mapasDelMenu[1], same(mapaDos));
-        expect(mapasDelMenu.skip(2), everyElement(isNull));
+        expect(mapasDelMenu[2], same(mapaTres));
+        expect(mapasDelMenu.skip(3), everyElement(isNull));
       },
     );
 
@@ -226,10 +244,34 @@ void main() {
       },
     );
 
+    testWidgets(
+      'Tocar el Mapa 3 abre el tablero con las celdas iniciales del Mapa 3',
+      (tester) async {
+        await abrirAplicacion(tester);
+
+        await tocar(tester, opcion(3));
+
+        expect(find.byType(TableroPage), findsOneWidget);
+        expect(botonInicio, findsOneWidget);
+        expect(textoMenu, findsNothing);
+        expect(find.text('+'), findsNWidgets(6));
+        for (final (fila, columna) in mapaTres.celdasIniciales) {
+          expect(
+            find.descendant(
+              of: find.byKey(Key('cell-$fila-$columna')),
+              matching: find.text('+'),
+            ),
+            findsOneWidget,
+            reason: 'celda ($fila, $columna)',
+          );
+        }
+      },
+    );
+
     testWidgets('Tocar un mapa bloqueado no abre nada', (tester) async {
       await abrirAplicacion(tester);
 
-      await tocar(tester, opcion(3));
+      await tocar(tester, opcion(4));
 
       expect(find.byType(SeleccionMapaPage), findsOneWidget);
       expect(find.byType(TableroPage), findsNothing);
@@ -245,7 +287,7 @@ void main() {
 
         expect(find.bySemanticsLabel('Mapa 1, disponible'), findsOneWidget);
         expect(find.bySemanticsLabel('Mapa 2, disponible'), findsOneWidget);
-        expect(find.bySemanticsLabel('Mapa 3, bloqueado'), findsOneWidget);
+        expect(find.bySemanticsLabel('Mapa 3, disponible'), findsOneWidget);
         expect(find.bySemanticsLabel('Mapa 4, bloqueado'), findsOneWidget);
         semantica.dispose();
       },

@@ -1,7 +1,6 @@
 import 'color_zona.dart';
 import 'mapa.dart';
 import 'tipo.dart';
-import 'validador_inicio.dart';
 
 const mapaTres = MapaTres();
 
@@ -42,7 +41,14 @@ class MapaTres extends Mapa {
   List<List<ColorZona>> get colores => _colores;
 
   @override
-  List<(int, int)> get celdasIniciales => ValidadorInicio.celdasIniciales;
+  List<(int, int)> get celdasIniciales => const [
+    (2, 3),
+    (2, 6),
+    (4, 4),
+    (5, 2),
+    (5, 7),
+    (7, 3),
+  ];
 
   @override
   Set<ColorZona> get coloresUnidos => const {

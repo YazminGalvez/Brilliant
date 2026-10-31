@@ -1,6 +1,7 @@
 import 'package:test/test.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/mapa_tres.dart';
+import 'package:juego_brilliant/partida.dart';
 import 'package:juego_brilliant/tablero.dart';
 import 'package:juego_brilliant/zona.dart';
 
@@ -277,5 +278,105 @@ void main() {
         expect(tablero.zonaEn(1, 3)!.validarNuevoMovimiento(3), isTrue);
       },
     );
+  });
+
+  group('Mapa 3: números iniciales', () {
+    const celdasEsperadas = [(2, 3), (2, 6), (4, 4), (5, 2), (5, 7), (7, 3)];
+
+    Partida partidaConNumerosIniciales() {
+      final partida = Partida(mapa: mapaTres);
+      final celdas = mapaTres.celdasIniciales;
+      for (var indice = 0; indice < celdas.length; indice++) {
+        final (fila, columna) = celdas[indice];
+        partida.colocarValorInicial(fila - 1, columna - 1, indice + 1);
+      }
+      return partida;
+    }
+
+    test('Tiene 6 celdas iniciales distintas dentro del tablero', () {
+      final celdas = mapaTres.celdasIniciales;
+
+      expect(celdas, celdasEsperadas);
+      expect(celdas.toSet(), hasLength(6));
+      for (final (fila, columna) in celdas) {
+        expect(fila, inInclusiveRange(1, 7), reason: '($fila, $columna)');
+        expect(columna, inInclusiveRange(1, 7), reason: '($fila, $columna)');
+      }
+      expect(mapaTres.crearTablero().celdasIniciales, celdasEsperadas);
+    });
+
+    test('Las celdas iniciales caen en las zonas esperadas', () {
+      final tablero = mapaTres.crearTablero();
+
+      Zona zonaDe((int, int) celda) =>
+          tablero.zonaEn(celda.$1 - 1, celda.$2 - 1)!;
+
+      expect(celdasEsperadas.map((celda) => zonaDe(celda).tipo.colorZona), [
+        ColorZona.morado,
+        ColorZona.amarillo,
+        ColorZona.gris,
+        ColorZona.azul,
+        ColorZona.verde,
+        ColorZona.morado,
+      ]);
+      expect(celdasEsperadas.map((celda) => zonaDe(celda).id), [
+        1,
+        0,
+        2,
+        6,
+        5,
+        7,
+      ]);
+    });
+
+    test('Cada número del 1 al 6 es aceptado por la zona de su celda', () {
+      final tablero = mapaTres.crearTablero();
+      final celdas = mapaTres.celdasIniciales;
+
+      for (var indice = 0; indice < celdas.length; indice++) {
+        final (fila, columna) = celdas[indice];
+        final zona = tablero.zonaEn(fila - 1, columna - 1)!;
+        final numero = indice + 1;
+
+        expect(
+          zona.validarNuevoMovimiento(numero),
+          isTrue,
+          reason: 'celda ($fila, $columna) con $numero',
+        );
+        tablero.colocarDato(fila - 1, columna - 1, numero);
+      }
+      expect(tablero.inicializado, isTrue);
+    });
+
+    test('Con los números del 1 al 6 la partida puede iniciar', () {
+      final partida = partidaConNumerosIniciales();
+
+      expect(partida.puedeIniciar, isTrue);
+      partida.iniciar();
+      expect(partida.estado, EstadoPartida.jugando);
+    });
+
+    test('Con dados fijos se coloca un número en un destino válido', () {
+      final partida = partidaConNumerosIniciales()..iniciar();
+
+      partida.registrarTirada([1, 2]);
+      final opcion = partida.opcionesAncla.firstWhere(
+        (opcion) => opcion.ancla == 1,
+      );
+      final destinos = partida.destinosValidos(opcion);
+
+      expect(opcion.puedeSeleccionarse, isTrue);
+      expect(destinos.map((celda) => (celda.fila, celda.columna)), [
+        (0, 2),
+        (1, 3),
+        (2, 2),
+      ]);
+
+      partida.colocar(opcion, 0, 2);
+
+      expect(partida.tablero.obtenerCelda(0, 2).valor, 2);
+      expect(partida.historialMovimientos.cantidad, 1);
+      expect(partida.tiradaActual, isNull);
+    });
   });
 }

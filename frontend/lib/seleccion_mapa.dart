@@ -3,11 +3,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:juego_brilliant/mapa.dart';
 import 'package:juego_brilliant/mapa_dos.dart';
+import 'package:juego_brilliant/mapa_tres.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/partida.dart';
 import 'package:frontend/main.dart';
 
-const List<Mapa?> mapasDelMenu = [mapaUno, mapaDos, null, null];
+const List<Mapa?> mapasDelMenu = [mapaUno, mapaDos, mapaTres, null];
 
 class SeleccionMapaPage extends StatelessWidget {
   const SeleccionMapaPage({this.random, super.key});
