@@ -1,6 +1,7 @@
 import 'package:test/test.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/mapa_cuatro.dart';
+import 'package:juego_brilliant/partida.dart';
 import 'package:juego_brilliant/tablero.dart';
 import 'package:juego_brilliant/zona.dart';
 
@@ -326,5 +327,120 @@ void main() {
         expect(tablero.zonaEn(1, 5)!.validarNuevoMovimiento(3), isTrue);
       },
     );
+  });
+
+  group('Mapa 4: números iniciales', () {
+    const celdasEsperadas = [(1, 5), (3, 3), (3, 6), (4, 1), (6, 5), (7, 2)];
+    const numerosValidos = [6, 2, 3, 4, 5, 1];
+
+    Partida partidaConNumerosIniciales() {
+      final partida = Partida(mapa: mapaCuatro);
+      final celdas = mapaCuatro.celdasIniciales;
+      for (var indice = 0; indice < celdas.length; indice++) {
+        final (fila, columna) = celdas[indice];
+        partida.colocarValorInicial(
+          fila - 1,
+          columna - 1,
+          numerosValidos[indice],
+        );
+      }
+      return partida;
+    }
+
+    test('Tiene 6 celdas iniciales distintas dentro del tablero', () {
+      final celdas = mapaCuatro.celdasIniciales;
+
+      expect(celdas, celdasEsperadas);
+      expect(celdas.toSet(), hasLength(6));
+      for (final (fila, columna) in celdas) {
+        expect(fila, inInclusiveRange(1, 7), reason: '($fila, $columna)');
+        expect(columna, inInclusiveRange(1, 7), reason: '($fila, $columna)');
+      }
+      expect(mapaCuatro.crearTablero().celdasIniciales, celdasEsperadas);
+    });
+
+    test('Las celdas iniciales caen en las zonas esperadas', () {
+      final tablero = mapaCuatro.crearTablero();
+
+      Zona zonaDe((int, int) celda) =>
+          tablero.zonaEn(celda.$1 - 1, celda.$2 - 1)!;
+
+      expect(celdasEsperadas.map((celda) => zonaDe(celda).tipo.colorZona), [
+        ColorZona.naranja,
+        ColorZona.morado,
+        ColorZona.rojo,
+        ColorZona.amarillo,
+        ColorZona.azul,
+        ColorZona.naranja,
+      ]);
+      expect(celdasEsperadas.map((celda) => zonaDe(celda).id), [
+        0,
+        6,
+        5,
+        1,
+        3,
+        7,
+      ]);
+    });
+
+    test(
+      'Los números del 1 al 6 en orden no caben porque el naranja de arriba no acepta el 1',
+      () {
+        final partida = Partida(mapa: mapaCuatro);
+
+        expect(partida.zonaAceptaValorInicial(0, 4, 1), isFalse);
+        expect(() => partida.colocarValorInicial(0, 4, 1), throwsArgumentError);
+      },
+    );
+
+    test('Hay un reparto del 1 al 6 que cada zona acepta', () {
+      final partida = Partida(mapa: mapaCuatro);
+      final celdas = mapaCuatro.celdasIniciales;
+
+      expect(numerosValidos.toSet(), {1, 2, 3, 4, 5, 6});
+      for (var indice = 0; indice < celdas.length; indice++) {
+        final (fila, columna) = celdas[indice];
+        final numero = numerosValidos[indice];
+
+        expect(
+          partida.zonaAceptaValorInicial(fila - 1, columna - 1, numero),
+          isTrue,
+          reason: 'celda ($fila, $columna) con $numero',
+        );
+        partida.colocarValorInicial(fila - 1, columna - 1, numero);
+      }
+      expect(partida.inicializado, isTrue);
+    });
+
+    test('Con ese reparto la partida puede iniciar', () {
+      final partida = partidaConNumerosIniciales();
+
+      expect(partida.puedeIniciar, isTrue);
+      partida.iniciar();
+      expect(partida.estado, EstadoPartida.jugando);
+    });
+
+    test('Con dados fijos se coloca un número en un destino válido', () {
+      final partida = partidaConNumerosIniciales()..iniciar();
+
+      partida.registrarTirada([6, 5]);
+      final opcion = partida.opcionesAncla.firstWhere(
+        (opcion) => opcion.ancla == 6,
+      );
+      final destinos = partida.destinosValidos(opcion);
+
+      expect(opcion.puedeSeleccionarse, isTrue);
+      expect(destinos.map((celda) => (celda.fila, celda.columna)), [
+        (0, 3),
+        (0, 5),
+        (1, 4),
+      ]);
+
+      partida.colocar(opcion, 1, 4);
+
+      expect(partida.tablero.obtenerCelda(1, 4).valor, 5);
+      expect(partida.historialMovimientos.cantidad, 1);
+      expect(partida.tiradaActual, isNull);
+    });
   });
 }

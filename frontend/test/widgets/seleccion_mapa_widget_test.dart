@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/seleccion_mapa.dart';
+import 'package:juego_brilliant/mapa_cuatro.dart';
 import 'package:juego_brilliant/mapa_dos.dart';
 import 'package:juego_brilliant/mapa_tres.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
@@ -182,24 +183,53 @@ void main() {
     );
 
     testWidgets(
-      'El Mapa 4 aparece próximamente con candado y sin vista previa',
+      'El Mapa 4 aparece disponible con una vista previa de 49 celdas con sus colores',
       (tester) async {
         await abrirMenuDeMapas(tester);
+
+        expect(
+          find.descendant(of: opcion(4), matching: find.text('Disponible')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: opcion(4), matching: find.text('Próximamente')),
+          findsNothing,
+        );
+        expect(tester.widget<InkWell>(opcion(4)).onTap, isNotNull);
+        expect(celdasDeVistaEn(opcion(4)), findsNWidgets(49));
+        for (var indice = 0; indice < 49; indice++) {
+          expect(
+            colorDeCeldaDeVista(tester, indice, 4),
+            colorDeZona(mapaCuatro.colorEn(indice ~/ 7, indice % 7)),
+            reason: 'celda $indice',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'Una tarjeta sin mapa aparece próximamente con candado y sin vista previa',
+      (tester) async {
+        await abrirMenuConMapas(tester, const [
+          mapaUno,
+          mapaDos,
+          mapaTres,
+          null,
+        ]);
 
         comprobarMapaBloqueado(tester, 4);
       },
     );
 
-    testWidgets(
-      'La lista del menú tiene cuatro mapas y solo los tres primeros están habilitados',
-      (tester) async {
-        expect(mapasDelMenu, hasLength(4));
-        expect(mapasDelMenu.first, same(mapaUno));
-        expect(mapasDelMenu[1], same(mapaDos));
-        expect(mapasDelMenu[2], same(mapaTres));
-        expect(mapasDelMenu.skip(3), everyElement(isNull));
-      },
-    );
+    testWidgets('La lista del menú tiene los cuatro mapas habilitados', (
+      tester,
+    ) async {
+      expect(mapasDelMenu, hasLength(4));
+      expect(mapasDelMenu.first, same(mapaUno));
+      expect(mapasDelMenu[1], same(mapaDos));
+      expect(mapasDelMenu[2], same(mapaTres));
+      expect(mapasDelMenu[3], same(mapaCuatro));
+    });
 
     testWidgets(
       'Tocar el Mapa 1 abre el tablero con una partida nueva en preparación',
@@ -268,8 +298,32 @@ void main() {
       },
     );
 
+    testWidgets(
+      'Tocar el Mapa 4 abre el tablero con las celdas iniciales del Mapa 4',
+      (tester) async {
+        await abrirAplicacion(tester);
+
+        await tocar(tester, opcion(4));
+
+        expect(find.byType(TableroPage), findsOneWidget);
+        expect(botonInicio, findsOneWidget);
+        expect(textoMenu, findsNothing);
+        expect(find.text('+'), findsNWidgets(6));
+        for (final (fila, columna) in mapaCuatro.celdasIniciales) {
+          expect(
+            find.descendant(
+              of: find.byKey(Key('cell-$fila-$columna')),
+              matching: find.text('+'),
+            ),
+            findsOneWidget,
+            reason: 'celda ($fila, $columna)',
+          );
+        }
+      },
+    );
+
     testWidgets('Tocar un mapa bloqueado no abre nada', (tester) async {
-      await abrirAplicacion(tester);
+      await abrirMenuConMapas(tester, const [mapaUno, mapaDos, mapaTres, null]);
 
       await tocar(tester, opcion(4));
 
@@ -288,10 +342,20 @@ void main() {
         expect(find.bySemanticsLabel('Mapa 1, disponible'), findsOneWidget);
         expect(find.bySemanticsLabel('Mapa 2, disponible'), findsOneWidget);
         expect(find.bySemanticsLabel('Mapa 3, disponible'), findsOneWidget);
-        expect(find.bySemanticsLabel('Mapa 4, bloqueado'), findsOneWidget);
+        expect(find.bySemanticsLabel('Mapa 4, disponible'), findsOneWidget);
         semantica.dispose();
       },
     );
+
+    testWidgets('Una tarjeta sin mapa se anuncia como bloqueada', (
+      tester,
+    ) async {
+      final semantica = tester.ensureSemantics();
+      await abrirMenuConMapas(tester, const [mapaUno, mapaDos, mapaTres, null]);
+
+      expect(find.bySemanticsLabel('Mapa 4, bloqueado'), findsOneWidget);
+      semantica.dispose();
+    });
 
     testWidgets(
       'En pantalla angosta de 360 px el menú y el tablero no se desbordan',

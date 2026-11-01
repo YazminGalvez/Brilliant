@@ -165,3 +165,16 @@ void usarTamanoDePantalla(WidgetTester tester, Size tamano) {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
+
+Future<void> abrirMenuConMapas(
+  WidgetTester tester,
+  List<Mapa?> mapas, {
+  Random? random,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: SeleccionMapaPage(random: random, mapas: mapas),
+    ),
+  );
+  await tester.pumpAndSettle();
+}

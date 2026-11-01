@@ -179,7 +179,8 @@ class _TableroPageState extends State<TableroPage> {
         title: Text('Número inicial ${indice + 1}'),
         children: [
           for (var numero = 1; numero <= 6; numero++)
-            if (!numerosUsados.contains(numero) || numero == valorActual)
+            if ((!numerosUsados.contains(numero) || numero == valorActual) &&
+                _partida.zonaAceptaValorInicial(fila, columna, numero))
               SimpleDialogOption(
                 onPressed: () => Navigator.pop(context, numero),
                 child: Text('$numero'),

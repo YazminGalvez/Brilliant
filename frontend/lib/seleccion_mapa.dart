@@ -2,18 +2,20 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:juego_brilliant/mapa.dart';
+import 'package:juego_brilliant/mapa_cuatro.dart';
 import 'package:juego_brilliant/mapa_dos.dart';
 import 'package:juego_brilliant/mapa_tres.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/partida.dart';
 import 'package:frontend/main.dart';
 
-const List<Mapa?> mapasDelMenu = [mapaUno, mapaDos, mapaTres, null];
+const List<Mapa?> mapasDelMenu = [mapaUno, mapaDos, mapaTres, mapaCuatro];
 
 class SeleccionMapaPage extends StatelessWidget {
-  const SeleccionMapaPage({this.random, super.key});
+  const SeleccionMapaPage({this.random, this.mapas = mapasDelMenu, super.key});
 
   final Random? random;
+  final List<Mapa?> mapas;
 
   void _abrirMapa(BuildContext context, Mapa mapa) {
     Navigator.of(context).push(
@@ -51,11 +53,11 @@ class SeleccionMapaPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  for (var index = 0; index < mapasDelMenu.length; index++) ...[
+                  for (var index = 0; index < mapas.length; index++) ...[
                     if (index > 0) const SizedBox(height: 12),
                     _TarjetaMapa(
                       numero: index + 1,
-                      mapa: mapasDelMenu[index],
+                      mapa: mapas[index],
                       onAbrir: (mapa) => _abrirMapa(context, mapa),
                     ),
                   ],

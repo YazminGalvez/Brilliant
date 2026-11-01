@@ -44,7 +44,27 @@ class Partida {
     if (valor != null && (valor < 1 || valor > 6)) {
       throw ArgumentError.value(valor, 'valor', 'Debe estar entre 1 y 6.');
     }
+    if (valor != null && !zonaAceptaValorInicial(fila, columna, valor)) {
+      throw ArgumentError.value(
+        valor,
+        'valor',
+        'La zona de la celda ($fila, $columna) no acepta ese número.',
+      );
+    }
     _tablero.colocarDato(fila, columna, valor);
+  }
+
+  bool zonaAceptaValorInicial(int fila, int columna, int valor) {
+    final zona = _tablero.zonaEn(fila, columna);
+    if (zona == null) return true;
+    final celda = _tablero.obtenerCelda(fila, columna);
+    final valorAnterior = celda.valor;
+    celda.valor = null;
+    try {
+      return zona.validarNuevoMovimiento(valor);
+    } finally {
+      celda.valor = valorAnterior;
+    }
   }
 
   void iniciar() {
