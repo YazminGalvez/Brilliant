@@ -210,4 +210,121 @@ void main() {
       ]);
     });
   });
+
+  group('Mapa 4: reglas y puntos', () {
+    late Tablero tablero;
+
+    setUp(() {
+      tablero = mapaCuatro.crearTablero();
+    });
+
+    int primerLugarDe(ColorZona color) => tablero.regiones
+        .firstWhere((zona) => zona.tipo.colorZona == color)
+        .tipo
+        .calcularPuntuacion(1);
+
+    test('Cada color da los puntos del primer lugar del Mapa 4', () {
+      expect(primerLugarDe(ColorZona.amarillo), 8);
+      expect(primerLugarDe(ColorZona.rojo), 6);
+      expect(primerLugarDe(ColorZona.azul), 8);
+      expect(primerLugarDe(ColorZona.verde), 3);
+      expect(primerLugarDe(ColorZona.morado), 7);
+      expect(primerLugarDe(ColorZona.naranja), 6);
+    });
+
+    test('Las dos zonas naranjas dan 6 puntos cada una', () {
+      expect(tablero.zonaEn(0, 0)!.tipo.calcularPuntuacion(1), 6);
+      expect(tablero.zonaEn(6, 0)!.tipo.calcularPuntuacion(1), 6);
+    });
+
+    test('La puntuación máxima del Mapa 4 es 50', () {
+      expect(tablero.puntuacionMaxima, 50);
+    });
+
+    test('El naranja de la fila 1 acepta números del 4 al 6', () {
+      tablero.colocarDato(0, 0, 5);
+
+      expect(tablero.zonaEn(0, 6)!.validarNuevoMovimiento(5), isTrue);
+      expect(tablero.zonaEn(0, 6)!.validarNuevoMovimiento(4), isTrue);
+    });
+
+    test('El naranja de la fila 1 rechaza números del 1 al 3', () {
+      expect(tablero.zonaEn(0, 3)!.validarNuevoMovimiento(3), isFalse);
+    });
+
+    test('El naranja de la fila 7 acepta números del 1 al 3', () {
+      tablero.colocarDato(6, 0, 2);
+
+      expect(tablero.zonaEn(6, 6)!.validarNuevoMovimiento(2), isTrue);
+      expect(tablero.zonaEn(6, 6)!.validarNuevoMovimiento(3), isTrue);
+    });
+
+    test('El naranja de la fila 7 rechaza números del 4 al 6', () {
+      expect(tablero.zonaEn(6, 3)!.validarNuevoMovimiento(4), isFalse);
+    });
+
+    test('La zona amarilla acepta en otra celda separada un número nuevo', () {
+      tablero.colocarDato(1, 0, 4);
+
+      expect(tablero.zonaEn(5, 6)!.validarNuevoMovimiento(3), isTrue);
+    });
+
+    test(
+      'La zona amarilla rechaza en otra celda separada un número repetido',
+      () {
+        tablero.colocarDato(1, 0, 4);
+
+        expect(tablero.zonaEn(5, 6)!.validarNuevoMovimiento(4), isFalse);
+      },
+    );
+
+    test('La zona azul acepta en otra celda separada el mismo número', () {
+      tablero.colocarDato(1, 2, 6);
+
+      expect(tablero.zonaEn(5, 4)!.validarNuevoMovimiento(6), isTrue);
+    });
+
+    test('La zona azul rechaza en otra celda separada un número distinto', () {
+      tablero.colocarDato(1, 2, 6);
+
+      expect(tablero.zonaEn(5, 4)!.validarNuevoMovimiento(1), isFalse);
+    });
+
+    test(
+      'La zona verde unida acepta cualquier número en sus celdas separadas',
+      () {
+        tablero.colocarDato(1, 3, 2);
+
+        expect(tablero.zonaEn(5, 3)!.validarNuevoMovimiento(2), isTrue);
+        expect(tablero.zonaEn(5, 3)!.validarNuevoMovimiento(6), isTrue);
+      },
+    );
+
+    test(
+      'El rojo de la izquierda acepta en un pedazo un número que no está en el otro',
+      () {
+        tablero.colocarDato(1, 1, 3);
+
+        expect(tablero.zonaEn(5, 1)!.validarNuevoMovimiento(4), isTrue);
+      },
+    );
+
+    test(
+      'El rojo de la izquierda rechaza en un pedazo un número que está en el otro',
+      () {
+        tablero.colocarDato(1, 1, 3);
+
+        expect(tablero.zonaEn(5, 1)!.validarNuevoMovimiento(3), isFalse);
+      },
+    );
+
+    test(
+      'El rojo de la derecha no se ve afectado por los números del de la izquierda',
+      () {
+        tablero.colocarDato(1, 1, 3);
+
+        expect(tablero.zonaEn(1, 5)!.validarNuevoMovimiento(3), isTrue);
+      },
+    );
+  });
 }

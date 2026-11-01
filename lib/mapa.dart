@@ -26,11 +26,17 @@ abstract class Mapa {
 
   Tipo crearTipo(ColorZona color) => Tipo.deColor(color);
 
+  Tipo crearTipoDeZona(ColorZona color, List<(int, int)> celdas) =>
+      crearTipo(color);
+
   Tablero crearTablero() => ConstructorTablero(
     colores: colores,
     coloresUnidos: coloresUnidos,
     celdasIniciales: celdasIniciales,
     crearTipo: crearTipo,
+    crearTipoDeZona: (color, celdas) => crearTipoDeZona(color, [
+      for (final (fila, columna) in celdas) (fila + 1, columna + 1),
+    ]),
     partesUnidas: [
       for (final grupo in partesUnidas)
         [for (final (fila, columna) in grupo) (fila - 1, columna - 1)],
