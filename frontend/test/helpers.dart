@@ -7,6 +7,7 @@ import 'package:frontend/seleccion_mapa.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/dados.dart';
 import 'package:juego_brilliant/mapa.dart';
+import 'package:juego_brilliant/mapa_cuatro.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/partida.dart';
 
@@ -177,4 +178,21 @@ Future<void> abrirMenuConMapas(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+const numerosInicialesMapaCuatro = [6, 2, 3, 4, 5, 1];
+
+Partida partidaEnJuegoMapaCuatro() {
+  final partida = Partida(mapa: mapaCuatro);
+  final celdas = mapaCuatro.celdasIniciales;
+  for (var index = 0; index < celdas.length; index++) {
+    final (fila, columna) = celdas[index];
+    partida.colocarValorInicial(
+      fila - 1,
+      columna - 1,
+      numerosInicialesMapaCuatro[index],
+    );
+  }
+  partida.iniciar();
+  return partida;
 }
