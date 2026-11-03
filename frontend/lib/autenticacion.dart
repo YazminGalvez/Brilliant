@@ -28,6 +28,12 @@ abstract class ServicioAutenticacion {
   Future<SesionUsuario> iniciarSesion(String nombre, String contrasena);
 
   Future<SesionUsuario> crearCuenta(String nombre, String contrasena);
+
+  Future<void> cerrarSesion();
+
+  Future<void> borrarCuenta(String contrasena);
+
+  Future<bool> sesionActiva();
 }
 
 String servidorPorDefecto() {
