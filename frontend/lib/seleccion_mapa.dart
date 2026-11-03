@@ -8,6 +8,8 @@ import 'package:juego_brilliant/mapa_tres.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/partida.dart';
 import 'package:frontend/main.dart';
+import 'package:frontend/menu_cuenta.dart';
+import 'package:frontend/proveedor_autenticacion.dart';
 
 const List<Mapa?> mapasDelMenu = [mapaUno, mapaDos, mapaTres, mapaCuatro];
 
@@ -30,7 +32,22 @@ class SeleccionMapaPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final proveedor = ProveedorAutenticacion.buscar(context);
+
     return Scaffold(
+      appBar: proveedor == null
+          ? null
+          : AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              actions: [
+                BotonCuenta(proveedor: proveedor),
+                const SizedBox(width: 8),
+              ],
+            ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),

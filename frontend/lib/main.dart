@@ -5,10 +5,15 @@ import 'package:juego_brilliant/color_zona.dart';
 import 'package:juego_brilliant/mapa_uno.dart';
 import 'package:juego_brilliant/partida.dart';
 import 'package:juego_brilliant/validador_anclas.dart';
+import 'package:frontend/autenticacion.dart';
+import 'package:frontend/cliente_autenticacion.dart';
+import 'package:frontend/inicio_sesion.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
 import 'package:frontend/panel_historial_movimientos.dart';
+import 'package:frontend/proveedor_autenticacion.dart';
 import 'package:frontend/seleccion_mapa.dart';
+import 'package:frontend/vigilante_sesion.dart';
 
 Color colorDeZona(ColorZona color) => switch (color) {
   ColorZona.amarillo => const Color(0xFFFEF3C7),
@@ -21,27 +26,71 @@ Color colorDeZona(ColorZona color) => switch (color) {
 };
 
 void main() {
-  runApp(const MainApp());
+  runApp(MainApp(servicio: ClienteAutenticacion()));
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({this.partida, this.random, super.key});
+  const MainApp({this.partida, this.random, this.servicio, super.key});
 
   final Partida? partida;
   final Random? random;
+  final ServicioAutenticacion? servicio;
+
+  Widget _menuVigilado(ServicioAutenticacion servicio) => VigilanteSesion(
+    servicio: servicio,
+    alPerderSesion: (context) => _volverAlInicio(
+      Navigator.of(context),
+      servicio,
+      aviso: VigilanteSesion.avisoSesionPerdida,
+    ),
+    child: SeleccionMapaPage(random: random),
+  );
+
+  InicioSesionPage _inicioSesion(
+    ServicioAutenticacion servicio, {
+    String? aviso,
+  }) => InicioSesionPage(
+    servicio: servicio,
+    siguiente: (_) => _menuVigilado(servicio),
+    aviso: aviso,
+  );
+
+  void _volverAlInicio(
+    NavigatorState navegador,
+    ServicioAutenticacion servicio, {
+    String? aviso,
+  }) {
+    navegador.pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => _inicioSesion(servicio, aviso: aviso),
+      ),
+      (_) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final servicio = this.servicio;
+    final aplicacion = MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF4F5F1),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3D6657)),
       ),
-      home: partida == null
+      home: servicio != null
+          ? _inicioSesion(servicio)
+          : partida == null
           ? SeleccionMapaPage(random: random)
           : TableroPage(partida: partida, random: random),
+    );
+    if (servicio == null) return aplicacion;
+
+    return ProveedorAutenticacion(
+      servicio: servicio,
+      volverAlInicio: (navegador, {aviso}) =>
+          _volverAlInicio(navegador, servicio, aviso: aviso),
+      child: aplicacion,
     );
   }
 }
