@@ -11,3 +11,5 @@ Aquí solo hay pruebas de widget (`testWidgets`) de la pantalla del juego.
   ```
   flutter test test/widgets
   ```
+- `cuenta_widget_test.dart`: inicio de sesión, registro y menú de cuenta con un
+  servicio falso definido en el mismo archivo (no usa el servidor real).
