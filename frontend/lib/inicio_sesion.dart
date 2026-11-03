@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:frontend/autenticacion.dart';
 import 'package:frontend/main.dart';
+import 'package:frontend/registro.dart';
 
 class InicioSesionPage extends StatefulWidget {
   const InicioSesionPage({
@@ -95,6 +96,18 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
     }
   }
 
+  void _abrirRegistro() {
+    widget.servicio.servidor = _servidor.text.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => RegistroPage(
+          servicio: widget.servicio,
+          siguiente: widget.siguiente,
+        ),
+      ),
+    );
+  }
+
   void _mostrarFallo(String mensaje) {
     setState(() {
       _error = mensaje;
@@ -139,7 +152,7 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
                     vertical: 24,
                   ),
                   children: [
-                    const _MarcaDelJuego(),
+                    const MarcaDelJuego(),
                     const SizedBox(height: 24),
                     Text(
                       'Inicia sesión',
@@ -262,6 +275,12 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
                             )
                           : const Text('Entrar'),
                     ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      key: const Key('login-crear-cuenta'),
+                      onPressed: _enviando ? null : _abrirRegistro,
+                      child: const Text('¿No tienes cuenta? Crear cuenta'),
+                    ),
                   ],
                 ),
               ),
@@ -273,8 +292,8 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
   }
 }
 
-class _MarcaDelJuego extends StatelessWidget {
-  const _MarcaDelJuego();
+class MarcaDelJuego extends StatelessWidget {
+  const MarcaDelJuego({super.key});
 
   @override
   Widget build(BuildContext context) {
