@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/crear_partida.dart';
 import 'package:frontend/inicio_sesion.dart';
 import 'package:frontend/partidas.dart';
+import 'package:frontend/unirse_partida.dart';
 
 class PantallaClara extends StatelessWidget {
   const PantallaClara({
@@ -85,6 +86,20 @@ class MultijugadorPage extends StatelessWidget {
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           icon: const Icon(Icons.add),
           label: const Text('Crear partida'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const Key('multi-unirse'),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => UnirseConCodigoPage(partidas: partidas),
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
+          icon: const Icon(Icons.login),
+          label: const Text('Unirse con código'),
         ),
       ],
     );
