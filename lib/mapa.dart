@@ -24,7 +24,10 @@ abstract class Mapa {
 
   List<List<(int, int)>> get partesUnidas => const [];
 
-  Tipo crearTipo(ColorZona color) => Tipo.deColor(color);
+  Map<ColorZona, PuntosPorLugar> get puntosPorColor => const {};
+
+  Tipo crearTipo(ColorZona color) =>
+      Tipo.deColor(color, puntos: puntosPorColor[color]);
 
   Tipo crearTipoDeZona(ColorZona color, List<(int, int)> celdas) =>
       crearTipo(color);

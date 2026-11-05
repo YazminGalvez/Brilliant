@@ -215,10 +215,10 @@ void main() {
       }
     });
 
-    test('El amarillo del Mapa 2 conserva los puntos de 2.º y 3.er lugar', () {
+    test('El amarillo del Mapa 2 da 6, 4 y 2 puntos por lugar', () {
       final amarilla = tablero.zonaEn(1, 1)!.tipo;
 
-      expect(amarilla.puntuaciones, {1: 6, 2: 6, 3: 4});
+      expect(amarilla.puntuaciones, {1: 6, 2: 4, 3: 2});
     });
 
     test('La puntuación máxima del Mapa 2 es 55', () {

@@ -2,25 +2,28 @@
 
 import 'color_zona.dart';
 
+typedef PuntosPorLugar = (int primero, int segundo, int tercero);
+
 class Color {
   final int value;
   const Color(this.value);
 }
 
 abstract class Tipo {
-  Tipo({this.primerLugar});
+  Tipo({this.puntos});
 
-  factory Tipo.deColor(ColorZona color, {int? primerLugar}) => switch (color) {
-    ColorZona.amarillo => TipoAmarillo(primerLugar: primerLugar),
-    ColorZona.verde => TipoVerde(primerLugar: primerLugar),
-    ColorZona.azul => TipoAzul(primerLugar: primerLugar),
-    ColorZona.morado => TipoMorado(primerLugar: primerLugar),
-    ColorZona.rojo => TipoRojo(primerLugar: primerLugar),
-    ColorZona.gris => TipoGris(primerLugar: primerLugar),
-    ColorZona.naranja => TipoNaranja(primerLugar: primerLugar),
-  };
+  factory Tipo.deColor(ColorZona color, {PuntosPorLugar? puntos}) =>
+      switch (color) {
+        ColorZona.amarillo => TipoAmarillo(puntos: puntos),
+        ColorZona.verde => TipoVerde(puntos: puntos),
+        ColorZona.azul => TipoAzul(puntos: puntos),
+        ColorZona.morado => TipoMorado(puntos: puntos),
+        ColorZona.rojo => TipoRojo(puntos: puntos),
+        ColorZona.gris => TipoGris(puntos: puntos),
+        ColorZona.naranja => TipoNaranja(puntos: puntos),
+      };
 
-  final int? primerLugar;
+  final PuntosPorLugar? puntos;
 
   Color get color;
   ColorZona get colorZona;
@@ -29,26 +32,30 @@ abstract class Tipo {
   bool esPosibleAgregar(List<int> actuales, int posible);
   Map<int, int> get puntuacionesPorDefecto;
 
-  Map<int, int> get puntuaciones => {
-    ...puntuacionesPorDefecto,
-    1: ?primerLugar,
+  Map<int, int> get puntuaciones => switch (puntos) {
+    null => puntuacionesPorDefecto,
+    (final primero, final segundo, final tercero) => {
+      1: primero,
+      2: segundo,
+      3: tercero,
+    },
   };
 
   int calcularPuntuacion([int posicion = 1]) {
-    final puntos = puntuaciones[posicion];
-    if (puntos == null) {
+    final valor = puntuaciones[posicion];
+    if (valor == null) {
       throw ArgumentError.value(
         posicion,
         'posicion',
         'La posición debe ser 1, 2 o 3.',
       );
     }
-    return puntos;
+    return valor;
   }
 }
 
 class TipoAzul extends Tipo {
-  TipoAzul({super.primerLugar});
+  TipoAzul({super.puntos});
 
   @override
   ColorZona get colorZona => ColorZona.azul;
@@ -68,15 +75,11 @@ class TipoAzul extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuacionesPorDefecto => {
-        1: 7,
-        2: 5,
-        3: 3,
-      };
+  Map<int, int> get puntuacionesPorDefecto => {1: 7, 2: 5, 3: 3};
 }
 
 class TipoRojo extends Tipo {
-  TipoRojo({super.primerLugar});
+  TipoRojo({super.puntos});
 
   @override
   ColorZona get colorZona => ColorZona.rojo;
@@ -96,15 +99,11 @@ class TipoRojo extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuacionesPorDefecto => {
-        1: 6,
-        2: 4,
-        3: 2,
-      };
+  Map<int, int> get puntuacionesPorDefecto => {1: 6, 2: 4, 3: 2};
 }
 
 class TipoVerde extends Tipo {
-  TipoVerde({super.primerLugar});
+  TipoVerde({super.puntos});
 
   @override
   ColorZona get colorZona => ColorZona.verde;
@@ -124,15 +123,11 @@ class TipoVerde extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuacionesPorDefecto => {
-        1: 4,
-        2: 3,
-        3: 2,
-      };
+  Map<int, int> get puntuacionesPorDefecto => {1: 4, 2: 3, 3: 2};
 }
 
 class TipoMorado extends Tipo {
-  TipoMorado({super.primerLugar});
+  TipoMorado({super.puntos});
 
   @override
   ColorZona get colorZona => ColorZona.morado;
@@ -153,15 +148,11 @@ class TipoMorado extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuacionesPorDefecto => {
-        1: 6,
-        2: 4,
-        3: 2,
-      };
+  Map<int, int> get puntuacionesPorDefecto => {1: 6, 2: 4, 3: 2};
 }
 
 class TipoAmarillo extends Tipo {
-  TipoAmarillo({super.primerLugar});
+  TipoAmarillo({super.puntos});
 
   @override
   ColorZona get colorZona => ColorZona.amarillo;
@@ -181,15 +172,11 @@ class TipoAmarillo extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuacionesPorDefecto => {
-        1: 8,
-        2: 6,
-        3: 4,
-      };
+  Map<int, int> get puntuacionesPorDefecto => {1: 8, 2: 6, 3: 4};
 }
 
 class TipoGris extends Tipo {
-  TipoGris({super.primerLugar});
+  TipoGris({super.puntos});
 
   @override
   ColorZona get colorZona => ColorZona.gris;
@@ -209,15 +196,11 @@ class TipoGris extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuacionesPorDefecto => {
-        1: 3,
-        2: 2,
-        3: 1,
-      };
+  Map<int, int> get puntuacionesPorDefecto => {1: 3, 2: 2, 3: 1};
 }
 
 class TipoNaranja extends Tipo {
-  TipoNaranja({this.minimo = 1, this.maximo = 6, super.primerLugar}) {
+  TipoNaranja({this.minimo = 1, this.maximo = 6, super.puntos}) {
     if (minimo < 1 || maximo > 6 || minimo > maximo) {
       throw ArgumentError(
         'El rango naranja debe estar entre 1 y 6 con minimo <= maximo: '
@@ -248,9 +231,5 @@ class TipoNaranja extends Tipo {
   }
 
   @override
-  Map<int, int> get puntuacionesPorDefecto => {
-        1: 6,
-        2: 4,
-        3: 3,
-      };
+  Map<int, int> get puntuacionesPorDefecto => {1: 6, 2: 4, 3: 3};
 }

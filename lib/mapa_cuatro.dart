@@ -65,18 +65,14 @@ class MapaCuatro extends Mapa {
   ];
 
   @override
-  Tipo crearTipo(ColorZona color) => Tipo.deColor(
-    color,
-    primerLugar: switch (color) {
-      ColorZona.amarillo => 8,
-      ColorZona.rojo => 6,
-      ColorZona.azul => 8,
-      ColorZona.verde => 3,
-      ColorZona.morado => 7,
-      ColorZona.naranja => 6,
-      ColorZona.gris => null,
-    },
-  );
+  Map<ColorZona, PuntosPorLugar> get puntosPorColor => const {
+    ColorZona.morado: (7, 5, 3),
+    ColorZona.azul: (8, 6, 4),
+    ColorZona.rojo: (6, 4, 2),
+    ColorZona.amarillo: (8, 6, 4),
+    ColorZona.verde: (3, 2, 1),
+    ColorZona.naranja: (6, 4, 3),
+  };
 
   @override
   Tipo crearTipoDeZona(ColorZona color, List<(int, int)> celdas) {
@@ -86,6 +82,10 @@ class MapaCuatro extends Mapa {
       7 => (1, 3),
       final fila => throw StateError('No hay naranja en la fila $fila.'),
     };
-    return TipoNaranja(minimo: minimo, maximo: maximo, primerLugar: 6);
+    return TipoNaranja(
+      minimo: minimo,
+      maximo: maximo,
+      puntos: puntosPorColor[ColorZona.naranja],
+    );
   }
 }

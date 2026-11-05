@@ -51,7 +51,10 @@ void main() {
     test('Muestra la info correcta', () {
       final tipoConfig = TipoAzul();
 
-      expect(tipoConfig.descripcion, equals('Todos los números deben ser iguales'));
+      expect(
+        tipoConfig.descripcion,
+        equals('Todos los números deben ser iguales'),
+      );
     });
   });
 
@@ -96,7 +99,8 @@ void main() {
     });
 
     test('La puntuación máxima del Mapa 1 es 54', () {
-      final maxima = 2 *
+      final maxima =
+          2 *
               (TipoRojo().calcularPuntuacion() +
                   TipoAzul().calcularPuntuacion() +
                   TipoVerde().calcularPuntuacion() +
@@ -140,16 +144,16 @@ void main() {
     });
   });
 
-  group('Puntos propios del primer lugar', () {
-    test('Sin primerLugar se usan los puntos por defecto', () {
+  group('Puntos propios de un mapa', () {
+    test('Sin puntos propios se usan los puntos por defecto', () {
       expect(Tipo.deColor(ColorZona.amarillo).puntuaciones, {1: 8, 2: 6, 3: 4});
     });
 
-    test('Con primerLugar cambia solo el 1er lugar', () {
-      final azul = Tipo.deColor(ColorZona.azul, primerLugar: 9);
+    test('Con puntos propios cambian los tres lugares', () {
+      final azul = Tipo.deColor(ColorZona.azul, puntos: (9, 6, 1));
 
       expect(azul, isA<TipoAzul>());
-      expect(azul.puntuaciones, {1: 9, 2: 5, 3: 3});
+      expect(azul.puntuaciones, {1: 9, 2: 6, 3: 1});
       expect(azul.calcularPuntuacion(), 9);
     });
   });

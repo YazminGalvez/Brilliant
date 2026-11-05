@@ -57,16 +57,12 @@ class MapaDos extends Mapa {
   };
 
   @override
-  Tipo crearTipo(ColorZona color) => Tipo.deColor(
-    color,
-    primerLugar: switch (color) {
-      ColorZona.amarillo => 6,
-      ColorZona.morado => 6,
-      ColorZona.rojo => 6,
-      ColorZona.azul => 7,
-      ColorZona.verde => 4,
-      ColorZona.gris => 3,
-      ColorZona.naranja => null,
-    },
-  );
+  Map<ColorZona, PuntosPorLugar> get puntosPorColor => const {
+    ColorZona.amarillo: (6, 4, 2),
+    ColorZona.morado: (6, 4, 2),
+    ColorZona.rojo: (6, 4, 2),
+    ColorZona.azul: (7, 5, 3),
+    ColorZona.verde: (4, 3, 2),
+    ColorZona.gris: (3, 2, 1),
+  };
 }
