@@ -11,10 +11,11 @@ class SesionUsuario {
 }
 
 class ErrorAutenticacion implements Exception {
-  const ErrorAutenticacion(this.mensaje, {this.codigo});
+  const ErrorAutenticacion(this.mensaje, {this.codigo, this.codigoServidor});
 
   final String mensaje;
   final int? codigo;
+  final String? codigoServidor;
 
   @override
   String toString() => mensaje;
@@ -34,6 +35,12 @@ abstract class ServicioAutenticacion {
   Future<void> borrarCuenta(String contrasena);
 
   Future<bool> sesionActiva();
+
+  Future<Map<String, Object?>?> enviarConSesion(
+    String metodo,
+    String ruta, {
+    Map<String, Object?>? cuerpo,
+  });
 }
 
 String servidorPorDefecto() {

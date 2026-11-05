@@ -80,6 +80,13 @@ class ServicioFalso implements ServicioAutenticacion {
     if (error != null) throw error;
     return sesionSigueActiva;
   }
+
+  @override
+  Future<Map<String, Object?>?> enviarConSesion(
+    String metodo,
+    String ruta, {
+    Map<String, Object?>? cuerpo,
+  }) => throw UnsupportedError('Las pruebas de cuenta no usan partidas.');
 }
 
 const sesionDeAna = SesionUsuario(

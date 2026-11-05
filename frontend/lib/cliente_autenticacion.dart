@@ -28,6 +28,16 @@ class ClienteAutenticacion implements ServicioAutenticacion {
   static const mensajeCuentaSinSesion =
       'Cuenta creada, pero no se pudo iniciar sesión. Inicia sesión '
       'manualmente.';
+  static const mensajeRespuestaInesperada =
+      'Respuesta inesperada del servidor.';
+  static const mensajeDatosDePartida =
+      'Los datos de la partida no son válidos.';
+  static const mensajePartidaNoEncontrada = 'Esa partida ya no existe.';
+  static const mensajePartidaLlena = 'La partida ya está llena.';
+  static const mensajePartidaComenzada = 'La partida ya comenzó.';
+  static const mensajePartidaNoComenzada = 'La partida todavía no comienza.';
+  static const mensajeYaEnPartida = 'Ya estás en una partida en juego.';
+  static const mensajeMapaNoDisponible = 'Ese mapa no está disponible.';
 
   final http.Client _cliente;
   String _servidor = '';
@@ -142,6 +152,48 @@ class ClienteAutenticacion implements ServicioAutenticacion {
     throw _errorDe(respuesta);
   }
 
+  @override
+  Future<Map<String, Object?>?> enviarConSesion(
+    String metodo,
+    String ruta, {
+    Map<String, Object?>? cuerpo,
+  }) async {
+    final sesion = _sesion;
+    if (sesion == null) {
+      throw const ErrorAutenticacion(
+        mensajeSesionTerminada,
+        codigo: 401,
+        codigoServidor: 'NO_AUTORIZADO',
+      );
+    }
+
+    final respuesta = await _enviar(
+      metodo,
+      ruta,
+      token: sesion.token,
+      cuerpo: cuerpo,
+    );
+    if (!_exitosa(respuesta)) {
+      if (respuesta.statusCode == 401) _olvidar(sesion);
+      throw _errorDe(respuesta, mensajeDeDatosInvalidos: mensajeDatosDePartida);
+    }
+    if (respuesta.statusCode == 204 || respuesta.bodyBytes.isEmpty) return null;
+
+    try {
+      final datos = jsonDecode(utf8.decode(respuesta.bodyBytes));
+      if (datos is Map<String, Object?>) return datos;
+    } on FormatException {
+      throw ErrorAutenticacion(
+        mensajeRespuestaInesperada,
+        codigo: respuesta.statusCode,
+      );
+    }
+    throw ErrorAutenticacion(
+      mensajeRespuestaInesperada,
+      codigo: respuesta.statusCode,
+    );
+  }
+
   Future<http.Response> _enviar(
     String metodo,
     String ruta, {
@@ -156,10 +208,10 @@ class ClienteAutenticacion implements ServicioAutenticacion {
         peticion.headers['Content-Type'] = 'application/json';
         peticion.bodyBytes = utf8.encode(jsonEncode(cuerpo));
       }
-      return await Future(() async {
-        final transmitida = await _cliente.send(peticion);
-        return http.Response.fromStream(transmitida);
-      }).timeout(limiteDeTiempo);
+      return await _cliente
+          .send(peticion)
+          .then(http.Response.fromStream)
+          .timeout(limiteDeTiempo);
     } catch (_) {
       throw const ErrorAutenticacion(mensajeConexion);
     }
@@ -190,18 +242,30 @@ class ClienteAutenticacion implements ServicioAutenticacion {
   static ErrorAutenticacion _errorDe(
     http.Response respuesta, {
     String mensajeDeCredenciales = mensajeCredenciales,
+    String mensajeDeDatosInvalidos = mensajeDatosInvalidos,
   }) {
     final estado = respuesta.statusCode;
-    final mensaje = switch (_codigoDe(respuesta)) {
+    final codigoServidor = _codigoDe(respuesta);
+    final mensaje = switch (codigoServidor) {
       'CREDENCIALES_INVALIDAS' => mensajeDeCredenciales,
       'NOMBRE_EN_USO' => mensajeNombreEnUso,
       'DEMASIADOS_INTENTOS' => _mensajeDemasiadosIntentos(respuesta),
       'NO_AUTORIZADO' => mensajeSesionTerminada,
+      'PARTIDA_NO_ENCONTRADA' => mensajePartidaNoEncontrada,
+      'PARTIDA_LLENA' => mensajePartidaLlena,
+      'PARTIDA_COMENZADA' => mensajePartidaComenzada,
+      'PARTIDA_NO_COMENZADA' => mensajePartidaNoComenzada,
+      'YA_EN_PARTIDA' => mensajeYaEnPartida,
+      'MAPA_NO_DISPONIBLE' => mensajeMapaNoDisponible,
       _ when estado == 429 => _mensajeDemasiadosIntentos(respuesta),
-      _ when estado == 400 => mensajeDatosInvalidos,
+      _ when estado == 400 => mensajeDeDatosInvalidos,
       _ => mensajeInesperado,
     };
-    return ErrorAutenticacion(mensaje, codigo: estado);
+    return ErrorAutenticacion(
+      mensaje,
+      codigo: estado,
+      codigoServidor: codigoServidor,
+    );
   }
 
   static String _mensajeDemasiadosIntentos(http.Response respuesta) {
