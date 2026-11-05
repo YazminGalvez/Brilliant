@@ -6,6 +6,8 @@ import 'package:juego_brilliant/mapas.dart';
 import 'package:juego_brilliant/partida.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/menu_cuenta.dart';
+import 'package:frontend/multijugador.dart';
+import 'package:frontend/partidas.dart';
 import 'package:frontend/proveedor_autenticacion.dart';
 
 const List<Mapa?> mapasDelMenu = mapasDisponibles;
@@ -73,6 +75,19 @@ class SeleccionMapaPage extends StatelessWidget {
                       numero: index + 1,
                       mapa: mapas[index],
                       onAbrir: (mapa) => _abrirMapa(context, mapa),
+                    ),
+                  ],
+                  if (ProveedorAutenticacion.maybeOf(context)
+                      case final servicio?) ...[
+                    const SizedBox(height: 20),
+                    _TarjetaMultijugador(
+                      onAbrir: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => MultijugadorPage(
+                            partidas: ServicioPartidas(servicio),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 20),
@@ -167,6 +182,34 @@ class _TarjetaMapa extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TarjetaMultijugador extends StatelessWidget {
+  const _TarjetaMultijugador({required this.onAbrir});
+
+  final VoidCallback onAbrir;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0x663D5147), width: 0.7),
+      ),
+      child: ListTile(
+        key: const Key('menu-multijugador'),
+        onTap: onAbrir,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: const Icon(Icons.group_outlined, color: Color(0xFF3D5147)),
+        title: const Text('Jugar con amigos'),
+        subtitle: const Text('Crea una partida y comparte el código.'),
+        trailing: const Icon(Icons.arrow_forward, color: Color(0xFF3D5147)),
       ),
     );
   }
