@@ -222,6 +222,10 @@ class ServicioPartidas {
         cuerpo: {'listo': listo},
       );
 
+  Future<void> salir(String codigo) async {
+    await autenticacion.enviarConSesion('POST', '${_rutaDeSala(codigo)}/salir');
+  }
+
   static String _rutaDeSala(String codigo) =>
       '/partidas/${Uri.encodeComponent(codigo.trim())}';
 

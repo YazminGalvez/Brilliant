@@ -21,6 +21,9 @@ class SalaEsperaPage extends StatefulWidget {
       'Hacen falta al menos 2 jugadores para empezar.';
   static const errorGeneral =
       'No se pudo cambiar tu estado. Inténtalo de nuevo.';
+  static const errorAlSalir =
+      'No se pudo salir de la sala. Inténtalo de nuevo.';
+  static const avisoCierreParaTodos = 'Si sales, la sala se cierra para todos.';
 
   final ServicioPartidas partidas;
   final SalaPartida salaInicial;
@@ -36,6 +39,7 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
   bool _cerrada = false;
   bool _salio = false;
   bool _enviandoListo = false;
+  bool _saliendo = false;
   String? _error;
 
   String? get _miNombre => widget.partidas.autenticacion.sesion?.nombre;
@@ -133,7 +137,74 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
     setState(() {
       _error = mensaje;
       _enviandoListo = false;
+      _saliendo = false;
     });
+  }
+
+  Future<bool> _confirmarCierre() async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (contexto) => AlertDialog(
+        title: const Text('¿Salir de la sala?'),
+        content: const Text(SalaEsperaPage.avisoCierreParaTodos),
+        actions: [
+          TextButton(
+            key: const Key('sala-cerrar-cancelar'),
+            onPressed: () => Navigator.of(contexto).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            key: const Key('sala-cerrar-confirmar'),
+            onPressed: () => Navigator.of(contexto).pop(true),
+            child: const Text('Salir y cerrar'),
+          ),
+        ],
+      ),
+    );
+    return confirmado ?? false;
+  }
+
+  Future<void> _salir() async {
+    if (_saliendo || _salio) return;
+    if (_sala.anfitrion == _miNombre && !await _confirmarCierre()) return;
+    if (!mounted || _saliendo || _salio) return;
+
+    _vigilante.detener();
+    setState(() {
+      _saliendo = true;
+      _error = null;
+    });
+
+    try {
+      await widget.partidas.salir(_sala.codigo);
+      _cerrarPantalla();
+    } on ErrorAutenticacion catch (error) {
+      if (!mounted) return;
+      final proveedor = ProveedorAutenticacion.buscar(context);
+      if (error.codigoServidor == 'NO_AUTORIZADO' && proveedor != null) {
+        proveedor.volverAlInicio(Navigator.of(context), aviso: error.mensaje);
+        return;
+      }
+      if (error.codigoServidor == 'PARTIDA_NO_ENCONTRADA') {
+        _cerrarPantalla();
+        return;
+      }
+      _seguirEnLaSala(error.mensaje);
+    } catch (_) {
+      if (!mounted) return;
+      _seguirEnLaSala(SalaEsperaPage.errorAlSalir);
+    }
+  }
+
+  void _cerrarPantalla() {
+    if (!mounted) return;
+    _salio = true;
+    Navigator.of(context).pop();
+  }
+
+  void _seguirEnLaSala(String mensaje) {
+    _mostrarFallo(mensaje);
+    _vigilante.iniciar();
   }
 
   void _copiarCodigo() {
@@ -147,8 +218,16 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cerrada) return _salaCerrada(context);
+    return PopScope<Object?>(
+      canPop: _cerrada || _salio,
+      onPopInvokedWithResult: (seCerro, _) {
+        if (!seCerro) _salir();
+      },
+      child: _cerrada ? _salaCerrada(context) : _salaAbierta(context),
+    );
+  }
 
+  Widget _salaAbierta(BuildContext context) {
     final tema = Theme.of(context);
     final colores = tema.colorScheme;
     final sala = _sala;
@@ -228,7 +307,7 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
         const SizedBox(height: 24),
         FilledButton(
           key: const Key('sala-listo'),
-          onPressed: _enviandoListo ? null : _cambiarListo,
+          onPressed: _enviandoListo || _saliendo ? null : _cambiarListo,
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           child: _enviandoListo
               ? const SizedBox(
@@ -237,6 +316,23 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Text(yoListo ? 'Ya no estoy listo' : 'Estoy listo'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const Key('sala-salir'),
+          onPressed: _saliendo ? null : _salir,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            foregroundColor: colores.error,
+          ),
+          icon: _saliendo
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.logout),
+          label: const Text('Salir de la sala'),
         ),
       ],
     );

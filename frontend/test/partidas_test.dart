@@ -470,6 +470,117 @@ void main() {
     });
   });
 
+  group('Salir de la sala', () {
+    test(
+      'Salir manda POST a la ruta de salir de la sala con el token',
+      () async {
+        final peticiones = <http.Request>[];
+        final partidas = await partidasQueResponden(
+          (_) => http.Response('', 204),
+          peticiones: peticiones,
+        );
+
+        await partidas.salir('K7M2QX');
+
+        final peticion = peticiones.single;
+        expect(peticion.method, 'POST');
+        expect(
+          peticion.url.toString(),
+          '$servidorDePrueba/api/v1/partidas/K7M2QX/salir',
+        );
+        expect(peticion.headers['Authorization'], 'Bearer token-de-prueba');
+        expect(peticion.bodyBytes, isEmpty);
+      },
+    );
+
+    test('El código se recorta antes de armar la ruta de salir', () async {
+      final peticiones = <http.Request>[];
+      final partidas = await partidasQueResponden(
+        (_) => http.Response('', 204),
+        peticiones: peticiones,
+      );
+
+      await partidas.salir(' K7M2QX  ');
+
+      expect(peticiones.single.url.path, '/api/v1/partidas/K7M2QX/salir');
+    });
+
+    test('Salir termina sin error aunque el servidor mande una sala', () async {
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(salaJson(), 200),
+      );
+
+      await expectLater(partidas.salir('K7M2QX'), completes);
+    });
+
+    test(
+      'Salir de una partida que ya no existe da PARTIDA_NO_ENCONTRADA',
+      () async {
+        final partidas = await partidasQueResponden(
+          (_) => errorDelServidor('PARTIDA_NO_ENCONTRADA', 404),
+        );
+
+        await expectLater(
+          partidas.salir('K7M2QX'),
+          throwsA(
+            errorDePartida(
+              'Esa partida ya no existe.',
+              codigoServidor: 'PARTIDA_NO_ENCONTRADA',
+            ),
+          ),
+        );
+      },
+    );
+
+    test('Salir sin conexión usa el mensaje de conexión', () async {
+      final partidas = await partidasQueResponden(
+        (_) => throw http.ClientException('Connection refused'),
+      );
+
+      await expectLater(
+        partidas.salir('K7M2QX'),
+        throwsA(errorDePartida(ClienteAutenticacion.mensajeConexion)),
+      );
+    });
+
+    test('Salir con la sesión vencida borra la sesión local', () async {
+      final servidor = ServidorDePartidasFalso(
+        (_) => errorDelServidor('NO_AUTORIZADO', 401),
+      );
+      final autenticacion = await servidor.clienteConSesion();
+
+      await expectLater(
+        ServicioPartidas(autenticacion).salir('K7M2QX'),
+        throwsA(
+          errorDePartida(
+            'Tu sesión terminó. Inicia sesión de nuevo.',
+            codigoServidor: 'NO_AUTORIZADO',
+          ),
+        ),
+      );
+      expect(autenticacion.sesion, isNull);
+    });
+
+    test('Salir sin sesión no llama al servidor', () async {
+      final servidor = ServidorDePartidasFalso((_) => http.Response('', 204));
+      final autenticacion = ClienteAutenticacion(
+        servidor: servidorDePrueba,
+        cliente: servidor.cliente,
+      );
+
+      await expectLater(
+        ServicioPartidas(autenticacion).salir('K7M2QX'),
+        throwsA(
+          errorDePartida(
+            'Tu sesión terminó. Inicia sesión de nuevo.',
+            codigoServidor: 'NO_AUTORIZADO',
+          ),
+        ),
+      );
+      expect(servidor.peticiones, isEmpty);
+    });
+  });
+
   group('Validación del código de partida', () {
     test('Un código de 6 letras y números es válido aunque tenga espacios', () {
       expect(ServicioPartidas.errorCodigo('K7M2QX'), isNull);
