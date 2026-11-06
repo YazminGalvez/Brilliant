@@ -213,7 +213,17 @@ class ServicioPartidas {
   }
 
   Future<SalaPartida> consultar(String codigo) =>
-      _pedirSala('GET', '/partidas/${Uri.encodeComponent(codigo.trim())}');
+      _pedirSala('GET', _rutaDeSala(codigo));
+
+  Future<SalaPartida> marcarListo(String codigo, {required bool listo}) =>
+      _pedirSala(
+        'POST',
+        '${_rutaDeSala(codigo)}/listo',
+        cuerpo: {'listo': listo},
+      );
+
+  static String _rutaDeSala(String codigo) =>
+      '/partidas/${Uri.encodeComponent(codigo.trim())}';
 
   Future<SalaPartida> _pedirSala(
     String metodo,

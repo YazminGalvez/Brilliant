@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:frontend/autenticacion.dart';
 import 'package:frontend/multijugador.dart';
+import 'package:frontend/partida_comenzada.dart';
 import 'package:frontend/partidas.dart';
+import 'package:frontend/proveedor_autenticacion.dart';
 import 'package:frontend/vigilante_sala.dart';
 
 class SalaEsperaPage extends StatefulWidget {
@@ -13,6 +16,11 @@ class SalaEsperaPage extends StatefulWidget {
   });
 
   static const avisoSalaCerrada = 'La sala se cerró.';
+  static const avisoCodigoCopiado = 'Código copiado';
+  static const avisoFaltanJugadores =
+      'Hacen falta al menos 2 jugadores para empezar.';
+  static const errorGeneral =
+      'No se pudo cambiar tu estado. Inténtalo de nuevo.';
 
   final ServicioPartidas partidas;
   final SalaPartida salaInicial;
@@ -24,8 +32,20 @@ class SalaEsperaPage extends StatefulWidget {
 
 class _SalaEsperaPageState extends State<SalaEsperaPage> {
   late SalaPartida _sala = widget.salaInicial;
-  bool _cerrada = false;
   late final VigilanteSala _vigilante;
+  bool _cerrada = false;
+  bool _salio = false;
+  bool _enviandoListo = false;
+  String? _error;
+
+  String? get _miNombre => widget.partidas.autenticacion.sesion?.nombre;
+
+  JugadorSala? get _yo {
+    for (final jugador in _sala.jugadores) {
+      if (jugador.nombre == _miNombre) return jugador;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -35,13 +55,16 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
       codigo: widget.salaInicial.codigo,
       salaInicial: widget.salaInicial,
       intervalo: widget.intervalo,
-      alCambiar: (sala) {
-        if (mounted) setState(() => _sala = sala);
-      },
+      alCambiar: _recibirSala,
       alCerrar: () {
         if (mounted) setState(() => _cerrada = true);
       },
-    )..iniciar();
+    );
+    if (widget.salaInicial.comenzada) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _irAPartida());
+    } else {
+      _vigilante.iniciar();
+    }
   }
 
   @override
@@ -50,11 +73,76 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
     super.dispose();
   }
 
+  void _recibirSala(SalaPartida sala) {
+    if (!mounted || _salio) return;
+    setState(() => _sala = sala);
+    if (sala.comenzada) _irAPartida();
+  }
+
+  void _irAPartida() {
+    if (!mounted || _salio) return;
+    _salio = true;
+    _vigilante.detener();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => PartidaComenzadaPage(sala: _sala),
+      ),
+    );
+  }
+
+  Future<void> _cambiarListo() async {
+    if (_enviandoListo) return;
+
+    final listo = !(_yo?.listo ?? false);
+    setState(() {
+      _enviandoListo = true;
+      _error = null;
+    });
+
+    try {
+      final sala = await widget.partidas.marcarListo(
+        _sala.codigo,
+        listo: listo,
+      );
+      if (!mounted) return;
+      setState(() => _enviandoListo = false);
+      _recibirSala(sala);
+    } on ErrorAutenticacion catch (error) {
+      if (!mounted) return;
+      final proveedor = ProveedorAutenticacion.buscar(context);
+      if (error.codigoServidor == 'NO_AUTORIZADO' && proveedor != null) {
+        proveedor.volverAlInicio(Navigator.of(context), aviso: error.mensaje);
+        return;
+      }
+      if (error.codigoServidor == 'PARTIDA_NO_ENCONTRADA') {
+        _vigilante.detener();
+        setState(() {
+          _enviandoListo = false;
+          _cerrada = true;
+        });
+        return;
+      }
+      _mostrarFallo(error.mensaje);
+    } catch (_) {
+      if (!mounted) return;
+      _mostrarFallo(SalaEsperaPage.errorGeneral);
+    }
+  }
+
+  void _mostrarFallo(String mensaje) {
+    setState(() {
+      _error = mensaje;
+      _enviandoListo = false;
+    });
+  }
+
   void _copiarCodigo() {
     Clipboard.setData(ClipboardData(text: _sala.codigo));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Código copiado.')));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text(SalaEsperaPage.avisoCodigoCopiado)),
+      );
   }
 
   @override
@@ -64,6 +152,8 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
     final tema = Theme.of(context);
     final colores = tema.colorScheme;
     final sala = _sala;
+    final yoListo = _yo?.listo ?? false;
+    final error = _error;
 
     return PantallaClara(
       titulo: 'Sala de espera',
@@ -74,29 +164,25 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
           style: TextStyle(fontSize: 15, color: colores.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
-              child: SelectableText(
-                sala.codigo,
-                key: const Key('sala-codigo'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 6,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ),
-            IconButton(
-              key: const Key('sala-copiar-codigo'),
-              tooltip: 'Copiar código',
-              icon: const Icon(Icons.copy_outlined),
-              onPressed: _copiarCodigo,
-            ),
-          ],
+        SelectableText(
+          sala.codigo,
+          key: const Key('sala-codigo'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 6,
+            fontFamily: 'monospace',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: OutlinedButton.icon(
+            key: const Key('sala-copiar'),
+            onPressed: _copiarCodigo,
+            icon: const Icon(Icons.copy_outlined),
+            label: const Text('Copiar código'),
+          ),
         ),
         const SizedBox(height: 24),
         _Dato(
@@ -118,21 +204,40 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
         Text('Jugadores', style: tema.textTheme.titleMedium),
         const SizedBox(height: 8),
         for (final jugador in sala.jugadores)
-          ListTile(
-            key: Key('sala-jugador-${jugador.nombre}'),
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              Icons.person_outline,
-              color: jugador.conectado ? colores.primary : colores.outline,
-            ),
-            title: Text(jugador.nombre),
-            subtitle: Text(
-              [
-                if (jugador.nombre == sala.anfitrion) 'Anfitrión',
-                jugador.conectado ? 'Conectado' : 'Desconectado',
-              ].join(' · '),
-            ),
+          _FilaJugador(
+            jugador: jugador,
+            esAnfitrion: jugador.nombre == sala.anfitrion,
+            esYo: jugador.nombre == _miNombre,
           ),
+        if (sala.jugadores.length < 2) ...[
+          const SizedBox(height: 8),
+          Text(
+            SalaEsperaPage.avisoFaltanJugadores,
+            key: const Key('sala-faltan-jugadores'),
+            style: TextStyle(color: colores.onSurfaceVariant),
+          ),
+        ],
+        if (error != null) ...[
+          const SizedBox(height: 16),
+          SelectableText(
+            error,
+            key: const Key('sala-error'),
+            style: TextStyle(color: colores.error),
+          ),
+        ],
+        const SizedBox(height: 24),
+        FilledButton(
+          key: const Key('sala-listo'),
+          onPressed: _enviandoListo ? null : _cambiarListo,
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          child: _enviandoListo
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(yoListo ? 'Ya no estoy listo' : 'Estoy listo'),
+        ),
       ],
     );
   }
@@ -162,6 +267,49 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
           child: const Text('Volver'),
         ),
       ],
+    );
+  }
+}
+
+class _FilaJugador extends StatelessWidget {
+  const _FilaJugador({
+    required this.jugador,
+    required this.esAnfitrion,
+    required this.esYo,
+  });
+
+  final JugadorSala jugador;
+  final bool esAnfitrion;
+  final bool esYo;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    final (estado, color, icono) = switch (jugador) {
+      JugadorSala(conectado: false) => (
+        'Sin conexión',
+        colores.outline,
+        Icons.wifi_off,
+      ),
+      JugadorSala(listo: true) => (
+        'Listo',
+        const Color(0xFF15803D),
+        Icons.check_circle_outline,
+      ),
+      _ => ('Esperando', colores.onSurfaceVariant, Icons.hourglass_empty),
+    };
+
+    return ListTile(
+      key: Key('sala-jugador-${jugador.nombre}'),
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icono, color: color),
+      title: Text(esYo ? '${jugador.nombre} (tú)' : jugador.nombre),
+      subtitle: esAnfitrion ? const Text('Anfitrión') : null,
+      trailing: Text(
+        estado,
+        key: Key('sala-estado-${jugador.nombre}'),
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

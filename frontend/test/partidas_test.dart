@@ -346,6 +346,130 @@ void main() {
     );
   });
 
+  group('Marcar listo', () {
+    test(
+      'Marcar listo manda listo true a la ruta de la sala con el token',
+      () async {
+        final peticiones = <http.Request>[];
+        final partidas = await partidasQueResponden(
+          (_) => respuestaJson(salaJson(), 200),
+          peticiones: peticiones,
+        );
+
+        await partidas.marcarListo('K7M2QX', listo: true);
+
+        final peticion = peticiones.single;
+        expect(peticion.method, 'POST');
+        expect(
+          peticion.url.toString(),
+          '$servidorDePrueba/api/v1/partidas/K7M2QX/listo',
+        );
+        expect(peticion.headers['Authorization'], 'Bearer token-de-prueba');
+        expect(cuerpoDe(peticion), {'listo': true});
+      },
+    );
+
+    test('Dejar de estar listo manda listo false', () async {
+      final peticiones = <http.Request>[];
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(salaJson(), 200),
+        peticiones: peticiones,
+      );
+
+      await partidas.marcarListo('K7M2QX', listo: false);
+
+      expect(cuerpoDe(peticiones.single), {'listo': false});
+    });
+
+    test('El código se recorta antes de armar la ruta', () async {
+      final peticiones = <http.Request>[];
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(salaJson(), 200),
+        peticiones: peticiones,
+      );
+
+      await partidas.marcarListo('  K7M2QX ', listo: true);
+
+      expect(peticiones.single.url.path, '/api/v1/partidas/K7M2QX/listo');
+    });
+
+    test('Devuelve la sala que responde el servidor', () async {
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(salaJson(comenzada: true), 200),
+      );
+
+      final sala = await partidas.marcarListo('K7M2QX', listo: true);
+
+      expect(sala.codigo, 'K7M2QX');
+      expect(sala.comenzada, isTrue);
+      expect(sala.jugadores.first.listo, isTrue);
+    });
+
+    test('Si la partida ya no existe da PARTIDA_NO_ENCONTRADA', () async {
+      final partidas = await partidasQueResponden(
+        (_) => errorDelServidor('PARTIDA_NO_ENCONTRADA', 404),
+      );
+
+      await expectLater(
+        partidas.marcarListo('K7M2QX', listo: true),
+        throwsA(
+          errorDePartida(
+            'Esa partida ya no existe.',
+            codigoServidor: 'PARTIDA_NO_ENCONTRADA',
+          ),
+        ),
+      );
+    });
+
+    test('Si la partida ya comenzó da PARTIDA_COMENZADA', () async {
+      final partidas = await partidasQueResponden(
+        (_) => errorDelServidor('PARTIDA_COMENZADA', 409),
+      );
+
+      await expectLater(
+        partidas.marcarListo('K7M2QX', listo: false),
+        throwsA(
+          errorDePartida(
+            'La partida ya comenzó.',
+            codigoServidor: 'PARTIDA_COMENZADA',
+          ),
+        ),
+      );
+    });
+
+    test('Una respuesta sin cuerpo da respuesta inesperada', () async {
+      final partidas = await partidasQueResponden(
+        (_) => http.Response('', 204),
+      );
+
+      await expectLater(
+        partidas.marcarListo('K7M2QX', listo: true),
+        throwsA(errorDePartida('Respuesta inesperada del servidor.')),
+      );
+    });
+
+    test('Sin sesión no se llama al servidor', () async {
+      final servidor = ServidorDePartidasFalso(
+        (_) => respuestaJson(salaJson(), 200),
+      );
+      final autenticacion = ClienteAutenticacion(
+        servidor: servidorDePrueba,
+        cliente: servidor.cliente,
+      );
+
+      await expectLater(
+        ServicioPartidas(autenticacion).marcarListo('K7M2QX', listo: true),
+        throwsA(
+          errorDePartida(
+            'Tu sesión terminó. Inicia sesión de nuevo.',
+            codigoServidor: 'NO_AUTORIZADO',
+          ),
+        ),
+      );
+      expect(servidor.peticiones, isEmpty);
+    });
+  });
+
   group('Validación del código de partida', () {
     test('Un código de 6 letras y números es válido aunque tenga espacios', () {
       expect(ServicioPartidas.errorCodigo('K7M2QX'), isNull);
