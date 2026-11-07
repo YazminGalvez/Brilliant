@@ -11,6 +11,7 @@ import 'package:frontend/inicio_sesion.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
 import 'package:frontend/panel_historial_movimientos.dart';
+import 'package:frontend/partida_compartida.dart';
 import 'package:frontend/proveedor_autenticacion.dart';
 import 'package:frontend/seleccion_mapa.dart';
 import 'package:frontend/vigilante_sesion.dart';
@@ -96,10 +97,11 @@ class MainApp extends StatelessWidget {
 }
 
 class TableroPage extends StatefulWidget {
-  const TableroPage({this.partida, this.random, super.key});
+  const TableroPage({this.partida, this.random, this.compartida, super.key});
 
   final Partida? partida;
   final Random? random;
+  final PartidaCompartida? compartida;
 
   @override
   State<TableroPage> createState() => _TableroPageState();
@@ -112,7 +114,65 @@ class _TableroPageState extends State<TableroPage> {
   @override
   void initState() {
     super.initState();
-    _partida = widget.partida ?? Partida(mapa: mapaUno);
+    final compartida = widget.compartida;
+    _partida =
+        widget.partida ??
+        Partida(
+          mapa:
+              (compartida == null ? null : mapaDeLaSala(compartida.sala)) ??
+              mapaUno,
+        );
+    if (compartida != null) {
+      _colocarTableroEnviado(compartida.sala.miTablero);
+      compartida
+        ..addListener(_alCambiarCompartida)
+        ..iniciar();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.compartida
+      ?..removeListener(_alCambiarCompartida)
+      ..detener();
+    super.dispose();
+  }
+
+  void _alCambiarCompartida() {
+    final compartida = widget.compartida;
+    if (!mounted || compartida == null) return;
+    setState(() {
+      if (!_partida.inicializado) {
+        _colocarTableroEnviado(compartida.sala.miTablero);
+      }
+    });
+  }
+
+  void _colocarTableroEnviado(List<int> numeros) {
+    final celdas = _partida.mapa.celdasIniciales;
+    if (numeros.length != celdas.length) return;
+    try {
+      for (var indice = 0; indice < celdas.length; indice++) {
+        final (fila, columna) = celdas[indice];
+        _partida.colocarValorInicial(fila - 1, columna - 1, numeros[indice]);
+      }
+    } on Object {
+      return;
+    }
+  }
+
+  bool get _bloqueadoPorCompartida {
+    final compartida = widget.compartida;
+    return compartida != null &&
+        (compartida.yaFinalice || compartida.enviando || compartida.cerrada);
+  }
+
+  Future<void> _finalizarTablero() async {
+    final compartida = widget.compartida;
+    if (compartida == null || !_partida.inicializado) return;
+    await compartida.enviarTablero([
+      for (final valor in _partida.valoresIniciales) valor!,
+    ]);
   }
 
   bool get _preparando => _partida.estado == EstadoPartida.preparando;
@@ -252,6 +312,7 @@ class _TableroPageState extends State<TableroPage> {
 
   VoidCallback? _accionDeCelda(int fila, int columna, bool esCeldaInicial) {
     if (_preparando) {
+      if (_bloqueadoPorCompartida) return null;
       return esCeldaInicial ? () => _editarCeldaInicial(fila, columna) : null;
     }
     if (_jugando && !esCeldaInicial) {
@@ -262,6 +323,7 @@ class _TableroPageState extends State<TableroPage> {
 
   @override
   Widget build(BuildContext context) {
+    final compartida = widget.compartida;
     final enCurso = !_preparando;
     final celdasIniciales = _celdasIniciales.toSet();
     final destinosValidos = _destinosValidos;
@@ -287,15 +349,23 @@ class _TableroPageState extends State<TableroPage> {
                           ),
                         ),
                       ),
-                      TextButton.icon(
-                        key: const Key('change-map-button'),
-                        onPressed: _cambiarDeMapa,
-                        icon: const Icon(Icons.map_outlined),
-                        label: const Text('Cambiar de mapa'),
-                      ),
+                      if (compartida == null)
+                        TextButton.icon(
+                          key: const Key('change-map-button'),
+                          onPressed: _cambiarDeMapa,
+                          icon: const Icon(Icons.map_outlined),
+                          label: const Text('Cambiar de mapa'),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
+                  if (compartida != null)
+                    Text(
+                      'Partida ${compartida.sala.codigo} · '
+                      'Mapa ${_partida.mapa.numero}',
+                      key: const Key('multi-encabezado'),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   Text(
                     switch (_partida.estado) {
                       EstadoPartida.preparando =>
@@ -503,7 +573,14 @@ class _TableroPageState extends State<TableroPage> {
                       );
                     },
                   ),
-                  if (_preparando) ...[
+                  if (_preparando && compartida != null) ...[
+                    const SizedBox(height: 16),
+                    _PanelTableroCompartido(
+                      compartida: compartida,
+                      tableroCompleto: _partida.inicializado,
+                      onFinalizar: _finalizarTablero,
+                    ),
+                  ] else if (_preparando) ...[
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
@@ -595,4 +672,145 @@ class _TableroPageState extends State<TableroPage> {
       .firstWhere((zona) => zona.id == idZona)
       .tipo
       .nombre;
+}
+
+class _PanelTableroCompartido extends StatelessWidget {
+  const _PanelTableroCompartido({
+    required this.compartida,
+    required this.tableroCompleto,
+    required this.onFinalizar,
+  });
+
+  final PartidaCompartida compartida;
+  final bool tableroCompleto;
+  final VoidCallback onFinalizar;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    final error = compartida.error;
+
+    if (compartida.cerrada) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'La partida se cerró.',
+            key: Key('multi-cerrada'),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            key: const Key('multi-volver'),
+            onPressed: () => Navigator.of(context).maybePop(),
+            child: const Text('Volver'),
+          ),
+        ],
+      );
+    }
+
+    if (!compartida.yaFinalice) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (error != null) ...[
+            SelectableText(
+              error.mensaje,
+              key: const Key('multi-error'),
+              style: TextStyle(color: colores.error),
+            ),
+            const SizedBox(height: 8),
+          ],
+          FilledButton(
+            key: const Key('multi-finalizar'),
+            onPressed: tableroCompleto && !compartida.enviando
+                ? onFinalizar
+                : null,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: compartida.enviando
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Finalizar tablero'),
+          ),
+          if (!tableroCompleto)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Faltan números iniciales: ingresa del 1 al 6 sin repetir.',
+              ),
+            ),
+        ],
+      );
+    }
+
+    return Card(
+      key: const Key('multi-esperando'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (compartida.todosTerminaron)
+              Text(
+                'Todos los jugadores finalizaron su tablero.',
+                key: const Key('multi-todos-listos'),
+                style: Theme.of(context).textTheme.titleMedium,
+              )
+            else
+              Row(
+                children: [
+                  Icon(Icons.hourglass_top, size: 20, color: colores.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Esperando a los demás jugadores...',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 8),
+            for (final jugador in compartida.jugadoresEnJuego)
+              Padding(
+                key: Key('multi-jugador-${jugador.nombre}'),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      jugador.tableroListo
+                          ? Icons.check_circle_outline
+                          : Icons.hourglass_empty,
+                      size: 20,
+                      color: jugador.tableroListo
+                          ? const Color(0xFF15803D)
+                          : colores.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        jugador.nombre == compartida.miNombre
+                            ? '${jugador.nombre} (tú)'
+                            : jugador.nombre,
+                      ),
+                    ),
+                    Text(
+                      jugador.tableroListo
+                          ? 'Tablero listo'
+                          : 'Colocando números',
+                      style: TextStyle(color: colores.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

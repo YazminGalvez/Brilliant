@@ -470,6 +470,102 @@ void main() {
     });
   });
 
+  group('Enviar el tablero inicial', () {
+    test('Manda los números a la ruta del tablero con el token', () async {
+      final peticiones = <http.Request>[];
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(salaJson(comenzada: true), 200),
+        peticiones: peticiones,
+      );
+
+      await partidas.enviarTablero('K7M2QX', [3, 1, 6, 2, 5, 4]);
+
+      final peticion = peticiones.single;
+      expect(peticion.method, 'POST');
+      expect(
+        peticion.url.toString(),
+        '$servidorDePrueba/api/v1/partidas/K7M2QX/tablero',
+      );
+      expect(peticion.headers['Authorization'], 'Bearer token-de-prueba');
+      expect(cuerpoDe(peticion), {
+        'numeros': [3, 1, 6, 2, 5, 4],
+      });
+    });
+
+    test('Devuelve la sala con mi tablero', () async {
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(
+          salaJson(
+            comenzada: true,
+            cambios: {
+              'miTablero': [3, 1, 6, 2, 5, 4],
+            },
+          ),
+          200,
+        ),
+      );
+
+      final sala = await partidas.enviarTablero('K7M2QX', [3, 1, 6, 2, 5, 4]);
+
+      expect(sala.miTablero, [3, 1, 6, 2, 5, 4]);
+    });
+
+    test('Un tablero inválido da DATOS_INVALIDOS', () async {
+      final partidas = await partidasQueResponden(
+        (_) => errorDelServidor('DATOS_INVALIDOS', 400),
+      );
+
+      await expectLater(
+        partidas.enviarTablero('K7M2QX', [1, 1, 1, 1, 1, 1]),
+        throwsA(
+          errorDePartida(
+            'Los datos de la partida no son válidos.',
+            codigoServidor: 'DATOS_INVALIDOS',
+          ),
+        ),
+      );
+    });
+
+    test('Si la partida no ha comenzado da PARTIDA_NO_COMENZADA', () async {
+      final partidas = await partidasQueResponden(
+        (_) => errorDelServidor('PARTIDA_NO_COMENZADA', 409),
+      );
+
+      await expectLater(
+        partidas.enviarTablero('K7M2QX', [1, 2, 3, 4, 5, 6]),
+        throwsA(
+          errorDePartida(
+            'La partida todavía no comienza.',
+            codigoServidor: 'PARTIDA_NO_COMENZADA',
+          ),
+        ),
+      );
+    });
+
+    test('Enviar el tablero sin sesión no llama al servidor', () async {
+      final servidor = ServidorDePartidasFalso(
+        (_) => respuestaJson(salaJson(), 200),
+      );
+      final autenticacion = ClienteAutenticacion(
+        servidor: servidorDePrueba,
+        cliente: servidor.cliente,
+      );
+
+      await expectLater(
+        ServicioPartidas(
+          autenticacion,
+        ).enviarTablero('K7M2QX', [1, 2, 3, 4, 5, 6]),
+        throwsA(
+          errorDePartida(
+            'Tu sesión terminó. Inicia sesión de nuevo.',
+            codigoServidor: 'NO_AUTORIZADO',
+          ),
+        ),
+      );
+      expect(servidor.peticiones, isEmpty);
+    });
+  });
+
   group('Salir de la sala', () {
     test(
       'Salir manda POST a la ruta de salir de la sala con el token',

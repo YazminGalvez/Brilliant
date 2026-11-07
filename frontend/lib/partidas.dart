@@ -222,6 +222,13 @@ class ServicioPartidas {
         cuerpo: {'listo': listo},
       );
 
+  Future<SalaPartida> enviarTablero(String codigo, List<int> numeros) =>
+      _pedirSala(
+        'POST',
+        '${_rutaDeSala(codigo)}/tablero',
+        cuerpo: {'numeros': numeros},
+      );
+
   Future<void> salir(String codigo) async {
     await autenticacion.enviarConSesion('POST', '${_rutaDeSala(codigo)}/salir');
   }

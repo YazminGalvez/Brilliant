@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/autenticacion.dart';
 import 'package:frontend/multijugador.dart';
-import 'package:frontend/partida_comenzada.dart';
+import 'package:frontend/main.dart';
+import 'package:frontend/partida_compartida.dart';
 import 'package:frontend/partidas.dart';
 import 'package:frontend/proveedor_autenticacion.dart';
 import 'package:frontend/vigilante_sala.dart';
@@ -89,7 +90,13 @@ class _SalaEsperaPageState extends State<SalaEsperaPage> {
     _vigilante.detener();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => PartidaComenzadaPage(sala: _sala),
+        builder: (_) => TableroPage(
+          compartida: PartidaCompartida(
+            partidas: widget.partidas,
+            salaInicial: _sala,
+            intervalo: widget.intervalo,
+          ),
+        ),
       ),
     );
   }
