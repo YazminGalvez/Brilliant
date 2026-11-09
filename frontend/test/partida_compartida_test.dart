@@ -560,6 +560,176 @@ void main() {
     });
   });
 
+  group('Puntos de la partida compartida', () {
+    SalaPartida salaConPuntos({
+      int ronda = 2,
+      Map<String, int> puntos = const {'ana': 0, 'luis': 0},
+      Map<String, Object?> zonas = const {},
+      bool terminada = false,
+      List<String> ganadores = const [],
+      String? motivoFin,
+    }) => SalaPartida.desdeJson(
+      salaJson(
+        comenzada: true,
+        ronda: ronda,
+        cambios: {
+          'jugadores': [
+            jugador('ana', tableroListo: true),
+            jugador('luis', tableroListo: true),
+          ],
+          'puntos': puntos,
+          'zonas': zonas,
+          'terminada': terminada,
+          'ganadores': ganadores,
+          'motivoFin': motivoFin,
+        },
+      ),
+    );
+
+    test('Los puntos vienen de la sala y quien no tiene puntos lleva 0', () {
+      final compartida = compartidaCon(
+        salaConPuntos(puntos: const {'luis': 7}),
+      );
+
+      expect(compartida.puntos, {'ana': 0, 'luis': 7});
+    });
+
+    test(
+      'Mi zona completada suma puntos antes de que el servidor la registre',
+      () async {
+        final espera = Completer<SalaPartida>();
+        partidas.alTerminarTurno = (_) => espera.future;
+        final compartida = compartidaCon(salaConPuntos());
+
+        compartida.terminarTurno(tableroLleno: false, zona: 1);
+
+        expect(compartida.puntos['ana'], 6);
+        expect(compartida.puntos['luis'], 0);
+        espera.complete(salaConPuntos());
+        await pumpEventQueue();
+        expect(compartida.puntos['ana'], 6);
+      },
+    );
+
+    test(
+      'Si otro completó antes la misma zona, mis puntos son los del segundo lugar',
+      () {
+        final compartida = compartidaCon(
+          salaConPuntos(
+            puntos: const {'ana': 0, 'luis': 6},
+            zonas: const {
+              '1': {'luis': 1},
+            },
+          ),
+        );
+        partidas.alTerminarTurno = (_) => Completer<SalaPartida>().future;
+
+        compartida.terminarTurno(tableroLleno: false, zona: 1);
+
+        expect(compartida.puntos, {'ana': 4, 'luis': 6});
+      },
+    );
+
+    test('Cuando el servidor registra mi zona se usan sus puntos', () async {
+      partidas.alTerminarTurno = (_) => salaConPuntos(
+        ronda: 3,
+        puntos: const {'ana': 9, 'luis': 0},
+        zonas: const {
+          '1': {'ana': 2},
+        },
+      );
+      final compartida = compartidaCon(salaConPuntos());
+
+      compartida.terminarTurno(tableroLleno: false, zona: 1);
+      await pumpEventQueue();
+
+      expect(compartida.puntos['ana'], 9);
+    });
+
+    test('La clasificación ordena de más a menos puntos', () {
+      final compartida = compartidaCon(
+        salaConPuntos(puntos: const {'ana': 4, 'luis': 11}),
+      );
+
+      expect(compartida.clasificacion.map((entrada) => entrada.key), [
+        'luis',
+        'ana',
+      ]);
+    });
+  });
+
+  group('Fin de la partida compartida', () {
+    SalaPartida salaTerminada(List<String> ganadores, String motivo) =>
+        SalaPartida.desdeJson(
+          salaJson(
+            comenzada: true,
+            ronda: 8,
+            cambios: {
+              'jugadores': [jugador('ana'), jugador('luis')],
+              'terminada': true,
+              'puntos': {'ana': 26, 'luis': 20},
+              'ganadores': ganadores,
+              'motivoFin': motivo,
+            },
+          ),
+        );
+
+    test('Antes de terminar no se gana', () {
+      final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+      expect(compartida.terminada, isFalse);
+      expect(compartida.gane, isFalse);
+    });
+
+    test('Si estoy entre los ganadores, gané', () {
+      final compartida = compartidaCon(salaTerminada(['ana'], 'meta'));
+
+      expect(compartida.terminada, isTrue);
+      expect(compartida.gane, isTrue);
+      expect(compartida.puedoJugarRonda, isFalse);
+      expect(compartida.esperandoALosDemas, isFalse);
+    });
+
+    test('En un empate todos los ganadores ganan', () {
+      final compartida = compartidaCon(
+        salaTerminada(['luis', 'ana'], 'sin_tableros'),
+      );
+
+      expect(compartida.gane, isTrue);
+    });
+
+    test('Si gana otro, no gané', () {
+      final compartida = compartidaCon(salaTerminada(['luis'], 'meta'));
+
+      expect(compartida.gane, isFalse);
+    });
+
+    testWidgets(
+      'Al llegar la sala terminada deja de consultar y de reintentar',
+      (tester) async {
+        partidas.alTerminarTurno = (_) => throw errorDeConexion;
+        partidas.alConsultar = (_) => salaTerminada(['ana'], 'meta');
+        final compartida = PartidaCompartida(
+          partidas: partidas,
+          salaInicial: rondaDeAnaYLuis(4),
+        )..iniciar();
+
+        compartida.terminarTurno(tableroLleno: false);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(compartida.terminada, isTrue);
+        expect(compartida.gane, isTrue);
+        expect(compartida.activa, isFalse);
+        expect(compartida.avisoPendiente, isNull);
+        final avisos = partidas.turnosAvisados.length;
+        await tester.pump(const Duration(seconds: 10));
+        expect(partidas.turnosAvisados, hasLength(avisos));
+        compartida.dispose();
+      },
+    );
+  });
+
   test('El mapa de la sala es el mapa disponible con ese número', () {
     final sala = salaConJugadores([jugador('ana')]);
 

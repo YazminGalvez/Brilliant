@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:juego_brilliant/mapa.dart';
 import 'package:juego_brilliant/mapas.dart';
+import 'package:juego_brilliant/puntos_multijugador.dart';
 import 'package:frontend/autenticacion.dart';
 import 'package:frontend/partidas.dart';
 import 'package:frontend/vigilante_sala.dart';
@@ -63,6 +64,7 @@ class PartidaCompartida extends ChangeNotifier {
   AvisoTurno? _avisoPendiente;
   bool _avisando = false;
   bool _miTableroLleno = false;
+  final Map<int, int> _misZonas = {};
   Timer? _reintento;
   ErrorAutenticacion? _errorTurno;
 
@@ -95,6 +97,54 @@ class PartidaCompartida extends ChangeNotifier {
     final enJuego = jugadoresEnJuego;
     return enJuego.isNotEmpty &&
         enJuego.every((jugador) => jugador.tableroListo);
+  }
+
+  bool get terminada => _sala.terminada;
+
+  bool get gane => terminada && _sala.ganadores.contains(miNombre);
+
+  Map<String, int> get puntos {
+    final puntos = {
+      for (final jugador in _sala.jugadores) jugador.nombre: 0,
+      ..._sala.puntos,
+    };
+    final nombre = miNombre;
+    final mapa = mapaDeLaSala(_sala);
+    if (nombre == null || mapa == null || terminada) return puntos;
+
+    final pendientes = {
+      for (final MapEntry(key: zona, value: ronda) in _misZonas.entries)
+        if (!(_sala.zonas[zona]?.containsKey(nombre) ?? false)) zona: ronda,
+    };
+    if (pendientes.isEmpty) return puntos;
+
+    final zonas = {
+      for (final MapEntry(:key, :value) in _sala.zonas.entries) key: {...value},
+    };
+    pendientes.forEach((zona, ronda) {
+      (zonas[zona] ??= {})[nombre] = ronda;
+    });
+    try {
+      puntos[nombre] =
+          PuntosMultijugador.puntosTotales(mapa, zonas)[nombre] ?? 0;
+    } on ArgumentError {
+      return puntos;
+    }
+    return puntos;
+  }
+
+  List<MapEntry<String, int>> get clasificacion {
+    final puntos = this.puntos;
+    final orden = [
+      for (final jugador in _sala.jugadores)
+        MapEntry(jugador.nombre, puntos[jugador.nombre] ?? 0),
+    ];
+    for (final MapEntry(:key, :value) in puntos.entries) {
+      if (!orden.any((entrada) => entrada.key == key)) {
+        orden.add(MapEntry(key, value));
+      }
+    }
+    return orden..sort((a, b) => b.value.compareTo(a.value));
   }
 
   List<int>? get resultado =>
@@ -161,6 +211,16 @@ class PartidaCompartida extends ChangeNotifier {
     }
   }
 
+  Future<void> salir() async {
+    detener();
+    if (_cerrada) return;
+    try {
+      await partidas.salir(_sala.codigo);
+    } on Object {
+      return;
+    }
+  }
+
   void terminarTurno({required bool tableroLleno, int? zona}) {
     if (!puedoJugarRonda) return;
 
@@ -170,6 +230,7 @@ class PartidaCompartida extends ChangeNotifier {
       zona: zona,
     );
     _miTableroLleno = _miTableroLleno || tableroLleno;
+    if (zona != null) _misZonas.putIfAbsent(zona, () => _sala.ronda);
     notifyListeners();
     _enviarAviso();
   }
@@ -237,6 +298,7 @@ class PartidaCompartida extends ChangeNotifier {
             (sala.ronda == aviso.ronda && (yo?.jugoRonda ?? false)))) {
       _confirmarAviso();
     }
+    if (sala.terminada) detener();
     notifyListeners();
   }
 

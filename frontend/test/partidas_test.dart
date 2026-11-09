@@ -182,6 +182,74 @@ void main() {
       );
     });
 
+    test('Lee el final de la partida con empate y motivo meta', () {
+      final sala = SalaPartida.desdeJson(
+        salaJson(
+          ronda: 9,
+          comenzada: true,
+          cambios: {
+            'terminada': true,
+            'puntos': {'ana': 27, 'luis': 27},
+            'ganadores': ['ana', 'luis'],
+            'motivoFin': 'meta',
+          },
+        ),
+      );
+
+      expect(sala.terminada, isTrue);
+      expect(sala.ganadores, ['ana', 'luis']);
+      expect(sala.motivoFin, SalaPartida.motivoMeta);
+      expect(sala.meta, 26);
+    });
+
+    test('Acepta los motivos de fin sin_tableros y abandono', () {
+      for (final motivo in ['sin_tableros', 'abandono']) {
+        expect(
+          SalaPartida.desdeJson(
+            salaJson(cambios: {'motivoFin': motivo}),
+          ).motivoFin,
+          motivo,
+        );
+      }
+    });
+
+    test('Un motivo de fin desconocido da respuesta inesperada', () {
+      expect(
+        () => SalaPartida.desdeJson(salaJson(cambios: {'motivoFin': 'otro'})),
+        throwsA(errorDePartida('Respuesta inesperada del servidor.')),
+      );
+    });
+
+    test('Puntos negativos o una meta negativa dan respuesta inesperada', () {
+      expect(
+        () => SalaPartida.desdeJson(
+          salaJson(
+            cambios: {
+              'puntos': {'ana': -1},
+            },
+          ),
+        ),
+        throwsA(errorDePartida('Respuesta inesperada del servidor.')),
+      );
+      expect(
+        () => SalaPartida.desdeJson(salaJson(cambios: {'meta': -5})),
+        throwsA(errorDePartida('Respuesta inesperada del servidor.')),
+      );
+    });
+
+    test('Ganadores que no son texto dan respuesta inesperada', () {
+      expect(
+        () => SalaPartida.desdeJson(
+          salaJson(
+            cambios: {
+              'ganadores': [1],
+            },
+          ),
+        ),
+        throwsA(errorDePartida('Respuesta inesperada del servidor.')),
+      );
+    });
+
     test('Una zona con un número de zona inválido da respuesta inesperada', () {
       expect(
         () => SalaPartida.desdeJson(

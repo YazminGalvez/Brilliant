@@ -110,10 +110,22 @@ class SalaPartida {
     required this.motivoFin,
   });
 
+  static const motivoMeta = 'meta';
+  static const motivoSinTableros = 'sin_tableros';
+  static const motivoAbandono = 'abandono';
+  static const motivosDeFin = {motivoMeta, motivoSinTableros, motivoAbandono};
+
   factory SalaPartida.desdeJson(Map<String, Object?> json) {
     final zonas = _campo<Map<String, Object?>>(json, 'zonas');
     final motivoFin = json['motivoFin'];
-    if (motivoFin != null && motivoFin is! String) throw _respuestaInesperada;
+    if (motivoFin != null && !motivosDeFin.contains(motivoFin)) {
+      throw _respuestaInesperada;
+    }
+    final puntos = _numerosPorNombre(json['puntos']);
+    final meta = _campo<int>(json, 'meta');
+    if (meta < 0 || puntos.values.any((valor) => valor < 0)) {
+      throw _respuestaInesperada;
+    }
 
     return SalaPartida(
       codigo: _campo<String>(json, 'codigo'),
@@ -135,8 +147,8 @@ class SalaPartida {
             value,
           ),
       }),
-      puntos: _numerosPorNombre(json['puntos']),
-      meta: _campo<int>(json, 'meta'),
+      puntos: puntos,
+      meta: meta,
       ganadores: _lista<String>(json, 'ganadores'),
       motivoFin: motivoFin as String?,
     );

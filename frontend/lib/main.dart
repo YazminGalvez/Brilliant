@@ -738,22 +738,7 @@ class _PanelTableroCompartido extends StatelessWidget {
     final error = compartida.error;
 
     if (compartida.cerrada) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'La partida se cerró.',
-            key: Key('multi-cerrada'),
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          FilledButton(
-            key: const Key('multi-volver'),
-            onPressed: () => Navigator.of(context).maybePop(),
-            child: const Text('Volver'),
-          ),
-        ],
-      );
+      return _PartidaNoDisponible(compartida: compartida);
     }
 
     if (!compartida.yaFinalice) {
@@ -862,6 +847,129 @@ class _PanelTableroCompartido extends StatelessWidget {
   }
 }
 
+void _volverAlMenu(BuildContext context, PartidaCompartida compartida) {
+  compartida.salir();
+  Navigator.of(context).popUntil((ruta) => ruta.isFirst);
+}
+
+class _PartidaNoDisponible extends StatelessWidget {
+  const _PartidaNoDisponible({required this.compartida});
+
+  final PartidaCompartida compartida;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const Key('multi-no-disponible'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'La partida ya no está disponible.',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              key: const Key('multi-volver-menu'),
+              onPressed: () => _volverAlMenu(context, compartida),
+              child: const Text('Volver al menú'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ListaDePuntos extends StatelessWidget {
+  const _ListaDePuntos({required this.compartida, required this.estadoDe});
+
+  final PartidaCompartida compartida;
+  final String? Function(String nombre) estadoDe;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    final clasificacion = compartida.clasificacion;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var posicion = 0; posicion < clasificacion.length; posicion++)
+          _FilaDePuntos(
+            posicion: posicion + 1,
+            nombre: clasificacion[posicion].key,
+            puntos: clasificacion[posicion].value,
+            esYo: clasificacion[posicion].key == compartida.miNombre,
+            estado: estadoDe(clasificacion[posicion].key),
+            colores: colores,
+          ),
+      ],
+    );
+  }
+}
+
+class _FilaDePuntos extends StatelessWidget {
+  const _FilaDePuntos({
+    required this.posicion,
+    required this.nombre,
+    required this.puntos,
+    required this.esYo,
+    required this.estado,
+    required this.colores,
+  });
+
+  final int posicion;
+  final String nombre;
+  final int puntos;
+  final bool esYo;
+  final String? estado;
+  final ColorScheme colores;
+
+  @override
+  Widget build(BuildContext context) {
+    final estado = this.estado;
+    return Container(
+      key: Key('multi-jugador-$nombre'),
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: esYo ? colores.primaryContainer : null,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: 28, child: Text('$posicion.')),
+          Expanded(
+            child: Text(
+              esYo ? '$nombre (tú)' : nombre,
+              style: TextStyle(fontWeight: esYo ? FontWeight.w700 : null),
+            ),
+          ),
+          if (estado != null) ...[
+            Text(
+              estado,
+              key: Key('multi-estado-$nombre'),
+              style: TextStyle(color: colores.onSurfaceVariant),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Text(
+            '$puntos pts',
+            key: Key('multi-puntos-$nombre'),
+            style: TextStyle(
+              fontWeight: esYo ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PanelRondaCompartida extends StatelessWidget {
   const _PanelRondaCompartida({
     required this.compartida,
@@ -871,9 +979,13 @@ class _PanelRondaCompartida extends StatelessWidget {
   final PartidaCompartida compartida;
   final bool tableroLleno;
 
-  String _estadoDe(JugadorSala jugador) {
+  String _estadoDe(String nombre) {
+    final jugador = compartida.sala.jugadores
+        .where((jugador) => jugador.nombre == nombre)
+        .firstOrNull;
+    if (jugador == null) return 'Salió';
     if (jugador.concedio) return 'Concedió';
-    final esYo = jugador.nombre == compartida.miNombre;
+    final esYo = nombre == compartida.miNombre;
     if (jugador.jugoRonda || (esYo && !compartida.puedoJugarRonda)) {
       return 'Jugó';
     }
@@ -882,26 +994,19 @@ class _PanelRondaCompartida extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (compartida.cerrada) return _PartidaNoDisponible(compartida: compartida);
+    if (compartida.terminada) return _PanelFinPartida(compartida: compartida);
+
     final tema = Theme.of(context);
     final colores = tema.colorScheme;
     final sala = compartida.sala;
     final errorTurno = compartida.errorTurno;
-
-    final (titulo, clave) = switch (compartida) {
-      PartidaCompartida(cerrada: true) => (
-        'La partida se cerró.',
-        'multi-cerrada',
-      ),
-      PartidaCompartida(sala: SalaPartida(terminada: true)) => (
-        'La partida terminó.',
-        'multi-terminada',
-      ),
-      PartidaCompartida(puedoJugarRonda: true) => (
-        'Tu turno: elige un ancla y un destino, o salta el turno.',
-        'multi-tu-turno',
-      ),
-      _ => ('Esperando a los demás...', 'multi-esperando-ronda'),
-    };
+    final (titulo, clave) = compartida.puedoJugarRonda
+        ? (
+            'Tu turno: elige un ancla y un destino, o salta el turno.',
+            'multi-tu-turno',
+          )
+        : ('Esperando a los demás...', 'multi-esperando-ronda');
 
     return Card(
       key: const Key('multi-jugadores'),
@@ -912,16 +1017,9 @@ class _PanelRondaCompartida extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(titulo, key: Key(clave), style: tema.textTheme.titleMedium),
-            if (tableroLleno && !sala.terminada && !compartida.cerrada) ...[
+            if (tableroLleno) ...[
               const SizedBox(height: 4),
               const Text('Llenaste tu tablero.'),
-            ],
-            if (sala.terminada && sala.ganadores.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Ganó: ${sala.ganadores.join(', ')}',
-                key: const Key('multi-ganadores'),
-              ),
             ],
             if (errorTurno != null && compartida.avisoPendiente != null) ...[
               const SizedBox(height: 8),
@@ -932,35 +1030,82 @@ class _PanelRondaCompartida extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 8),
-            for (final jugador in sala.jugadores)
-              Padding(
-                key: Key('multi-jugador-${jugador.nombre}'),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        jugador.nombre == compartida.miNombre
-                            ? '${jugador.nombre} (tú)'
-                            : jugador.nombre,
-                      ),
-                    ),
-                    Text(
-                      _estadoDe(jugador),
-                      key: Key('multi-estado-${jugador.nombre}'),
-                      style: TextStyle(color: colores.onSurfaceVariant),
-                    ),
-                  ],
-                ),
+            Text(
+              'Meta: ${sala.meta} puntos',
+              key: const Key('multi-meta'),
+              style: TextStyle(color: colores.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            _ListaDePuntos(compartida: compartida, estadoDe: _estadoDe),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelFinPartida extends StatelessWidget {
+  const _PanelFinPartida({required this.compartida});
+
+  final PartidaCompartida compartida;
+
+  static String motivoDeFin(String? motivo) => switch (motivo) {
+    SalaPartida.motivoMeta => 'Alguien llegó a la meta.',
+    SalaPartida.motivoSinTableros => 'Nadie puede seguir jugando.',
+    SalaPartida.motivoAbandono => 'Los demás jugadores abandonaron.',
+    _ => 'La partida terminó.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    final sala = compartida.sala;
+    final ganadores = sala.ganadores;
+
+    return Card(
+      key: const Key('multi-fin'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              compartida.gane ? '¡Ganaste!' : 'Partida terminada',
+              key: const Key('multi-resultado'),
+              style: tema.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-            if (compartida.cerrada || sala.terminada) ...[
+            ),
+            const SizedBox(height: 4),
+            Text(
+              motivoDeFin(sala.motivoFin),
+              key: const Key('multi-motivo'),
+              style: TextStyle(color: tema.colorScheme.onSurfaceVariant),
+            ),
+            if (ganadores.isNotEmpty) ...[
               const SizedBox(height: 8),
-              FilledButton(
-                key: const Key('multi-volver'),
-                onPressed: () => Navigator.of(context).maybePop(),
-                child: const Text('Volver'),
+              Text(
+                ganadores.length == 1
+                    ? 'Ganó ${ganadores.single}'
+                    : 'Empate: ${ganadores.join(', ')}',
+                key: const Key('multi-ganadores'),
+                style: tema.textTheme.titleMedium,
               ),
             ],
+            const SizedBox(height: 12),
+            Text('Clasificación', style: tema.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            _ListaDePuntos(compartida: compartida, estadoDe: (_) => null),
+            const SizedBox(height: 16),
+            FilledButton(
+              key: const Key('multi-volver-menu'),
+              onPressed: () => _volverAlMenu(context, compartida),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              child: const Text('Volver al menú'),
+            ),
           ],
         ),
       ),
