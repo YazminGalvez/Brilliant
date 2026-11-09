@@ -24,3 +24,10 @@ Aquí solo hay pruebas de widget (`testWidgets`) de la pantalla del juego.
   y 4, con un `ServicioPartidasFalso` definido en el mismo archivo. La sesión
   falsa de ambos archivos de multijugador es `AutenticacionFalsa`, de
   `../helpers.dart`.
+- `multijugador_conceder_widget_test.dart`: conceder la partida, jugadores que
+  conceden o pierden la conexión, la franja "Sin conexión con el servidor.
+  Reintentando..." con el reenvío del turno, "Volver a tu partida", la partida
+  cerrada por el servidor y cerrar sesión en plena partida. Usa un
+  `ServicioPartidasFalso` definido en el mismo archivo; su sesión falsa responde
+  `/partidas/actual` y `/conceder` con ese mismo servicio, porque el menú de
+  cuenta crea su propio `ServicioPartidas`.
