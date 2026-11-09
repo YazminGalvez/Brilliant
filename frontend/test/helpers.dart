@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/autenticacion.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/seleccion_mapa.dart';
 import 'package:juego_brilliant/color_zona.dart';
@@ -195,4 +196,25 @@ Partida partidaEnJuegoMapaCuatro() {
   }
   partida.iniciar();
   return partida;
+}
+
+class AutenticacionFalsa implements ServicioAutenticacion {
+  AutenticacionFalsa(String nombre)
+    : sesion = SesionUsuario(token: 'token', idUsuario: '1', nombre: nombre);
+
+  @override
+  String servidor = 'http://127.0.0.1:8080';
+
+  @override
+  final SesionUsuario? sesion;
+
+  @override
+  Future<Map<String, Object?>?> enviarConSesion(
+    String metodo,
+    String ruta, {
+    Map<String, Object?>? cuerpo,
+  }) async => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -18,3 +18,9 @@ Aquí solo hay pruebas de widget (`testWidgets`) de la pantalla del juego.
   `ServicioPartidasFalso` definido en el mismo archivo: guarda la sala, registra
   las llamadas y puede fallar. Las consultas de la sala se hacen avanzando el
   tiempo 2 segundos.
+- `multijugador_partida_widget_test.dart`: partida multijugador en `TableroPage`
+  (números iniciales y "Finalizar tablero", dados del servidor, mover o saltar el
+  turno, panel de jugadores, meta y fin con ganadores o empate) en los mapas 1, 2
+  y 4, con un `ServicioPartidasFalso` definido en el mismo archivo. La sesión
+  falsa de ambos archivos de multijugador es `AutenticacionFalsa`, de
+  `../helpers.dart`.

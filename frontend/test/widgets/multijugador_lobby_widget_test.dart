@@ -16,27 +16,6 @@ import 'package:frontend/unirse_partida.dart';
 import '../helpers.dart';
 import '../partidas_de_prueba.dart';
 
-class AutenticacionFalsa implements ServicioAutenticacion {
-  AutenticacionFalsa(String nombre)
-    : sesion = SesionUsuario(token: 'token', idUsuario: '1', nombre: nombre);
-
-  @override
-  String servidor = servidorDePrueba;
-
-  @override
-  final SesionUsuario? sesion;
-
-  @override
-  Future<Map<String, Object?>?> enviarConSesion(
-    String metodo,
-    String ruta, {
-    Map<String, Object?>? cuerpo,
-  }) async => null;
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
 Map<String, Object?> jugadorEnSala(
   String nombre, {
   bool listo = false,
