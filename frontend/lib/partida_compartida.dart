@@ -50,6 +50,8 @@ class PartidaCompartida extends ChangeNotifier {
 
   static const errorGeneral =
       'No se pudo enviar el tablero. Inténtalo de nuevo.';
+  static const errorAlConceder =
+      'No se pudo conceder la partida. Inténtalo de nuevo.';
 
   final ServicioPartidas partidas;
   final Duration esperaReintento;
@@ -67,6 +69,21 @@ class PartidaCompartida extends ChangeNotifier {
   final Map<int, int> _misZonas = {};
   Timer? _reintento;
   ErrorAutenticacion? _errorTurno;
+
+  bool _concedi = false;
+  bool _concediendo = false;
+  ErrorAutenticacion? _errorConceder;
+
+  bool get concedi => _concedi || (yo?.concedio ?? false);
+  bool get concediendo => _concediendo;
+  ErrorAutenticacion? get errorConceder => _errorConceder;
+
+  bool get puedoConceder =>
+      _sala.comenzada &&
+      !_sala.terminada &&
+      !_cerrada &&
+      !concedi &&
+      !_concediendo;
 
   SalaPartida get sala => _sala;
   bool get cerrada => _cerrada;
@@ -159,6 +176,7 @@ class PartidaCompartida extends ChangeNotifier {
         resultado != null &&
         jugador != null &&
         !jugador.concedio &&
+        !_concedi &&
         !jugador.jugoRonda &&
         !_miTableroLleno &&
         _rondaAvisada < ronda &&
@@ -167,6 +185,7 @@ class PartidaCompartida extends ChangeNotifier {
 
   bool get esperandoALosDemas =>
       !_cerrada &&
+      !concedi &&
       _sala.comenzada &&
       !_sala.terminada &&
       _sala.ronda > 0 &&
@@ -206,6 +225,39 @@ class PartidaCompartida extends ChangeNotifier {
     } catch (_) {
       _enviando = false;
       _error = const ErrorAutenticacion(errorGeneral);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> conceder() async {
+    if (!puedoConceder) return false;
+
+    _concediendo = true;
+    _errorConceder = null;
+    notifyListeners();
+
+    try {
+      final sala = await partidas.conceder(_sala.codigo);
+      _concediendo = false;
+      _concedi = true;
+      _avisoPendiente = null;
+      detener();
+      _sala = sala;
+      notifyListeners();
+      return true;
+    } on ErrorAutenticacion catch (error) {
+      _concediendo = false;
+      _errorConceder = error;
+      if (error.codigoServidor == 'PARTIDA_NO_ENCONTRADA') {
+        _cerrada = true;
+        detener();
+      }
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _concediendo = false;
+      _errorConceder = const ErrorAutenticacion(errorAlConceder);
       notifyListeners();
       return false;
     }

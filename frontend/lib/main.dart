@@ -169,6 +169,37 @@ class _TableroPageState extends State<TableroPage> {
     _opcionAnclaSeleccionada = null;
   }
 
+  Future<void> _confirmarConceder() async {
+    final compartida = widget.compartida;
+    if (compartida == null || !compartida.puedoConceder) return;
+
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (contexto) => AlertDialog(
+        title: const Text('¿Conceder la partida?'),
+        content: const Text(
+          'Si concedes, pierdes la partida y no podrás ganarla.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('conceder-cancelar'),
+            onPressed: () => Navigator.of(contexto).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            key: const Key('conceder-confirmar'),
+            onPressed: () => Navigator.of(contexto).pop(true),
+            child: const Text('Conceder'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+    await compartida.conceder();
+  }
+
+  bool get _concedi => widget.compartida?.concedi ?? false;
+
   int? _zonaCompletadaEn(int fila, int columna) {
     final zona = _partida.tablero.zonaEn(fila, columna);
     if (zona == null || !zona.verificarCompletado()) return null;
@@ -279,7 +310,7 @@ class _TableroPageState extends State<TableroPage> {
   }
 
   void _saltarTurno() {
-    if (!_partida.puedeSaltarTurno) return;
+    if (!_partida.puedeSaltarTurno || _concedi) return;
 
     setState(() {
       _partida.saltarTurno();
@@ -347,7 +378,7 @@ class _TableroPageState extends State<TableroPage> {
       if (_bloqueadoPorCompartida) return null;
       return esCeldaInicial ? () => _editarCeldaInicial(fila, columna) : null;
     }
-    if (_jugando && !esCeldaInicial) {
+    if (_jugando && !esCeldaInicial && !_concedi) {
       return () => _confirmarMovimiento(fila, columna);
     }
     return null;
@@ -387,6 +418,29 @@ class _TableroPageState extends State<TableroPage> {
                           onPressed: _cambiarDeMapa,
                           icon: const Icon(Icons.map_outlined),
                           label: const Text('Cambiar de mapa'),
+                        )
+                      else if (compartida.puedoConceder ||
+                          compartida.concediendo)
+                        TextButton.icon(
+                          key: const Key('multi-conceder'),
+                          onPressed: compartida.concediendo
+                              ? null
+                              : _confirmarConceder,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
+                          ),
+                          icon: compartida.concediendo
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.flag_outlined),
+                          label: const Text('Conceder partida'),
                         ),
                     ],
                   ),
@@ -542,7 +596,7 @@ class _TableroPageState extends State<TableroPage> {
                           ),
                         ),
                       );
-                      final panelDados = enCurso
+                      final panelDados = enCurso && !_concedi
                           ? LanzamientoDados(
                               opciones: _opcionesVisibles,
                               puedeLanzar:
@@ -995,12 +1049,15 @@ class _PanelRondaCompartida extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (compartida.cerrada) return _PartidaNoDisponible(compartida: compartida);
-    if (compartida.terminada) return _PanelFinPartida(compartida: compartida);
+    if (compartida.terminada || compartida.concedi) {
+      return _PanelFinPartida(compartida: compartida);
+    }
 
     final tema = Theme.of(context);
     final colores = tema.colorScheme;
     final sala = compartida.sala;
     final errorTurno = compartida.errorTurno;
+    final errorConceder = compartida.errorConceder;
     final (titulo, clave) = compartida.puedoJugarRonda
         ? (
             'Tu turno: elige un ancla y un destino, o salta el turno.',
@@ -1029,6 +1086,14 @@ class _PanelRondaCompartida extends StatelessWidget {
                 style: TextStyle(color: colores.error),
               ),
             ],
+            if (errorConceder != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                errorConceder.mensaje,
+                key: const Key('multi-error-conceder'),
+                style: TextStyle(color: colores.error),
+              ),
+            ],
             const SizedBox(height: 8),
             Text(
               'Meta: ${sala.meta} puntos',
@@ -1052,7 +1117,7 @@ class _PanelFinPartida extends StatelessWidget {
   static String motivoDeFin(String? motivo) => switch (motivo) {
     SalaPartida.motivoMeta => 'Alguien llegó a la meta.',
     SalaPartida.motivoSinTableros => 'Nadie puede seguir jugando.',
-    SalaPartida.motivoAbandono => 'Los demás jugadores abandonaron.',
+    SalaPartida.motivoAbandono => 'Los demás jugadores concedieron.',
     _ => 'La partida terminó.',
   };
 
@@ -1060,7 +1125,17 @@ class _PanelFinPartida extends StatelessWidget {
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     final sala = compartida.sala;
-    final ganadores = sala.ganadores;
+    final ganadores = sala.terminada ? sala.ganadores : const <String>[];
+    final ganePorAbandono =
+        compartida.gane && sala.motivoFin == SalaPartida.motivoAbandono;
+    final titulo = switch (compartida) {
+      PartidaCompartida(concedi: true) => 'Concediste la partida.',
+      _ when ganePorAbandono => 'Ganaste: los demás concedieron.',
+      PartidaCompartida(gane: true) => '¡Ganaste!',
+      _ => 'Partida terminada',
+    };
+    final mostrarMotivo =
+        sala.terminada && !ganePorAbandono && !compartida.concedi;
 
     return Card(
       key: const Key('multi-fin'),
@@ -1071,18 +1146,20 @@ class _PanelFinPartida extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              compartida.gane ? '¡Ganaste!' : 'Partida terminada',
+              titulo,
               key: const Key('multi-resultado'),
               style: tema.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              motivoDeFin(sala.motivoFin),
-              key: const Key('multi-motivo'),
-              style: TextStyle(color: tema.colorScheme.onSurfaceVariant),
-            ),
+            if (mostrarMotivo) ...[
+              const SizedBox(height: 4),
+              Text(
+                motivoDeFin(sala.motivoFin),
+                key: const Key('multi-motivo'),
+                style: TextStyle(color: tema.colorScheme.onSurfaceVariant),
+              ),
+            ],
             if (ganadores.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(

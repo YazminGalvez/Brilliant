@@ -29,8 +29,20 @@ class PartidasFalsas extends ServicioPartidas {
         jugador('ana', jugoRonda: true),
         jugador('luis'),
       ], ronda: aviso.ronda);
+  FutureOr<SalaPartida> Function() alConceder = () => salaConJugadores([
+    jugador('ana', tableroListo: true, concedio: true),
+    jugador('luis', tableroListo: true),
+    jugador('eva', tableroListo: true),
+  ], ronda: 3);
   final tablerosEnviados = <List<int>>[];
   final turnosAvisados = <AvisoTurno>[];
+  var concesiones = 0;
+
+  @override
+  Future<SalaPartida> conceder(String codigo) async {
+    concesiones++;
+    return alConceder();
+  }
 
   @override
   Future<SalaPartida> consultar(String codigo) async => alConsultar(codigo);
@@ -728,6 +740,152 @@ void main() {
         compartida.dispose();
       },
     );
+  });
+
+  group('Conceder la partida compartida', () {
+    test('Antes de comenzar no se puede conceder', () async {
+      final compartida = compartidaCon(
+        SalaPartida.desdeJson(
+          salaJson(
+            cambios: {
+              'jugadores': [jugador('ana')],
+            },
+          ),
+        ),
+      );
+
+      expect(compartida.puedoConceder, isFalse);
+      expect(await compartida.conceder(), isFalse);
+      expect(partidas.concesiones, 0);
+    });
+
+    test('Al conceder deja de jugar y guarda la sala del servidor', () async {
+      final compartida = compartidaCon(rondaDeAnaYLuis(3));
+      expect(compartida.puedoConceder, isTrue);
+      expect(compartida.puedoJugarRonda, isTrue);
+
+      final concedido = await compartida.conceder();
+
+      expect(concedido, isTrue);
+      expect(partidas.concesiones, 1);
+      expect(compartida.concedi, isTrue);
+      expect(compartida.puedoJugarRonda, isFalse);
+      expect(compartida.puedoConceder, isFalse);
+      expect(compartida.esperandoALosDemas, isFalse);
+      expect(compartida.activa, isFalse);
+      expect(compartida.gane, isFalse);
+      expect(compartida.sala.jugadores.first.concedio, isTrue);
+    });
+
+    test('Mientras se concede no se manda otra vez', () async {
+      final espera = Completer<SalaPartida>();
+      partidas.alConceder = () => espera.future;
+      final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+      final primera = compartida.conceder();
+      final segunda = await compartida.conceder();
+
+      expect(compartida.concediendo, isTrue);
+      expect(segunda, isFalse);
+      espera.complete(
+        salaConJugadores([jugador('ana', concedio: true)], ronda: 3),
+      );
+      expect(await primera, isTrue);
+      expect(partidas.concesiones, 1);
+      expect(compartida.concediendo, isFalse);
+    });
+
+    test('Después de conceder no se avisan más turnos', () async {
+      final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+      await compartida.conceder();
+      compartida.terminarTurno(tableroLleno: false, zona: 2);
+      await pumpEventQueue();
+
+      expect(partidas.turnosAvisados, isEmpty);
+      expect(compartida.avisoPendiente, isNull);
+    });
+
+    testWidgets(
+      'Conceder cancela el aviso de turno que se estaba reintentando',
+      (tester) async {
+        partidas.alTerminarTurno = (_) => throw errorDeConexion;
+        final compartida = PartidaCompartida(
+          partidas: partidas,
+          salaInicial: rondaDeAnaYLuis(3),
+        );
+
+        compartida.terminarTurno(tableroLleno: false);
+        await tester.pump();
+        await compartida.conceder();
+        await tester.pump(const Duration(seconds: 10));
+
+        expect(partidas.turnosAvisados, hasLength(1));
+        expect(compartida.avisoPendiente, isNull);
+        compartida.dispose();
+      },
+    );
+
+    test('Si falla al conceder sigue jugando y guarda el error', () async {
+      partidas.alConceder = () => throw errorDeConexion;
+      final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+      final concedido = await compartida.conceder();
+
+      expect(concedido, isFalse);
+      expect(compartida.concedi, isFalse);
+      expect(compartida.errorConceder, errorDeConexion);
+      expect(compartida.puedoJugarRonda, isTrue);
+      expect(compartida.puedoConceder, isTrue);
+    });
+
+    test('Si la partida ya no existe al conceder queda cerrada', () async {
+      partidas.alConceder = () => throw const ErrorAutenticacion(
+        'Esa partida ya no existe.',
+        codigo: 404,
+        codigoServidor: 'PARTIDA_NO_ENCONTRADA',
+      );
+      final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+      await compartida.conceder();
+
+      expect(compartida.cerrada, isTrue);
+      expect(compartida.concedi, isFalse);
+    });
+
+    test('Si la sala dice que concedí, cuenta como concedido', () {
+      final compartida = compartidaCon(
+        salaConJugadores([
+          jugador('ana', concedio: true),
+          jugador('luis'),
+        ], ronda: 4),
+      );
+
+      expect(compartida.concedi, isTrue);
+      expect(compartida.puedoJugarRonda, isFalse);
+    });
+
+    test('Cuando los demás conceden y quedo solo, gano por abandono', () {
+      final compartida = compartidaCon(
+        SalaPartida.desdeJson(
+          salaJson(
+            comenzada: true,
+            ronda: 5,
+            cambios: {
+              'jugadores': [jugador('ana'), jugador('luis', concedio: true)],
+              'terminada': true,
+              'ganadores': ['ana'],
+              'motivoFin': 'abandono',
+            },
+          ),
+        ),
+      );
+
+      expect(compartida.terminada, isTrue);
+      expect(compartida.gane, isTrue);
+      expect(compartida.concedi, isFalse);
+      expect(compartida.sala.motivoFin, SalaPartida.motivoAbandono);
+    });
   });
 
   test('El mapa de la sala es el mapa disponible con ese número', () {

@@ -743,6 +743,130 @@ void main() {
     });
   });
 
+  group('Conceder la partida', () {
+    test(
+      'Manda POST a la ruta de conceder con el token y sin cuerpo',
+      () async {
+        final peticiones = <http.Request>[];
+        final partidas = await partidasQueResponden(
+          (_) => respuestaJson(salaJson(ronda: 3, comenzada: true), 200),
+          peticiones: peticiones,
+        );
+
+        await partidas.conceder(' K7M2QX ');
+
+        final peticion = peticiones.single;
+        expect(peticion.method, 'POST');
+        expect(
+          peticion.url.toString(),
+          '$servidorDePrueba/api/v1/partidas/K7M2QX/conceder',
+        );
+        expect(peticion.headers['Authorization'], 'Bearer token-de-prueba');
+        expect(peticion.bodyBytes, isEmpty);
+      },
+    );
+
+    test('Devuelve la sala con el jugador marcado como que concedió', () async {
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(
+          salaJson(
+            ronda: 3,
+            comenzada: true,
+            cambios: {
+              'jugadores': [
+                {
+                  'nombre': 'ana',
+                  'listo': true,
+                  'tableroListo': true,
+                  'conectado': true,
+                  'concedio': true,
+                  'jugoRonda': false,
+                },
+              ],
+              'terminada': true,
+              'ganadores': ['luis'],
+              'motivoFin': 'abandono',
+            },
+          ),
+          200,
+        ),
+      );
+
+      final sala = await partidas.conceder('K7M2QX');
+
+      expect(sala.jugadores.single.concedio, isTrue);
+      expect(sala.motivoFin, SalaPartida.motivoAbandono);
+      expect(sala.ganadores, ['luis']);
+    });
+
+    test('Conceder antes de comenzar da PARTIDA_NO_COMENZADA', () async {
+      final partidas = await partidasQueResponden(
+        (_) => errorDelServidor('PARTIDA_NO_COMENZADA', 409),
+      );
+
+      await expectLater(
+        partidas.conceder('K7M2QX'),
+        throwsA(
+          errorDePartida(
+            'La partida todavía no comienza.',
+            codigoServidor: 'PARTIDA_NO_COMENZADA',
+          ),
+        ),
+      );
+    });
+
+    test(
+      'Conceder una partida que ya no existe da PARTIDA_NO_ENCONTRADA',
+      () async {
+        final partidas = await partidasQueResponden(
+          (_) => errorDelServidor('PARTIDA_NO_ENCONTRADA', 404),
+        );
+
+        await expectLater(
+          partidas.conceder('K7M2QX'),
+          throwsA(
+            errorDePartida(
+              'Esa partida ya no existe.',
+              codigoServidor: 'PARTIDA_NO_ENCONTRADA',
+            ),
+          ),
+        );
+      },
+    );
+
+    test('Conceder sin conexión usa el mensaje de conexión', () async {
+      final partidas = await partidasQueResponden(
+        (_) => throw http.ClientException('Connection refused'),
+      );
+
+      await expectLater(
+        partidas.conceder('K7M2QX'),
+        throwsA(errorDePartida(ClienteAutenticacion.mensajeConexion)),
+      );
+    });
+
+    test('Conceder sin sesión no llama al servidor', () async {
+      final servidor = ServidorDePartidasFalso(
+        (_) => respuestaJson(salaJson(), 200),
+      );
+      final autenticacion = ClienteAutenticacion(
+        servidor: servidorDePrueba,
+        cliente: servidor.cliente,
+      );
+
+      await expectLater(
+        ServicioPartidas(autenticacion).conceder('K7M2QX'),
+        throwsA(
+          errorDePartida(
+            'Tu sesión terminó. Inicia sesión de nuevo.',
+            codigoServidor: 'NO_AUTORIZADO',
+          ),
+        ),
+      );
+      expect(servidor.peticiones, isEmpty);
+    });
+  });
+
   group('Salir de la sala', () {
     test(
       'Salir manda POST a la ruta de salir de la sala con el token',
