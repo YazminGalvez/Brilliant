@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:juego_brilliant/dados.dart';
 import 'package:juego_brilliant/validador_anclas.dart';
@@ -14,6 +15,7 @@ class LanzamientoDados extends StatefulWidget {
     this.puedeSaltarTurno = false,
     this.onSaltarTurno,
     this.random,
+    this.dadosDelServidor,
     super.key,
   });
 
@@ -25,6 +27,7 @@ class LanzamientoDados extends StatefulWidget {
   final bool puedeSaltarTurno;
   final VoidCallback? onSaltarTurno;
   final Random? random;
+  final List<int>? dadosDelServidor;
 
   @override
   State<LanzamientoDados> createState() => _LanzamientoDadosState();
@@ -90,6 +93,15 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
   }
 
   @override
+  void didUpdateWidget(LanzamientoDados anterior) {
+    super.didUpdateWidget(anterior);
+    final dados = widget.dadosDelServidor;
+    if (dados != null && !listEquals(dados, anterior.dadosDelServidor)) {
+      _controlador.forward(from: 0);
+    }
+  }
+
+  @override
   void dispose() {
     _controlador.dispose();
     super.dispose();
@@ -107,17 +119,19 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
             : 220.0;
         final mostrarSaltarTurno =
             widget.puedeSaltarTurno && !_controlador.isAnimating;
+        final dadosDelServidor = widget.dadosDelServidor;
+        final resultados = dadosDelServidor ?? _resultados;
         final contenidoDados = Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (var index = 0; index < _resultados.length; index++) ...[
+                for (var index = 0; index < resultados.length; index++) ...[
                   if (index > 0) const SizedBox(width: 24),
                   AnimatedBuilder(
                     animation: _controlador,
-                    child: _CaraDado(valor: _resultados[index] ?? 1),
+                    child: _CaraDado(valor: resultados[index] ?? 1),
                     builder: (context, child) => Transform.rotate(
                       angle: _rotacion.value * (index.isEven ? 1 : -1),
                       child: Transform.scale(
@@ -133,14 +147,14 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (var index = 0; index < _resultados.length; index++) ...[
+                for (var index = 0; index < resultados.length; index++) ...[
                   if (index > 0) const SizedBox(width: 8),
                   Semantics(
                     label:
-                        'Dado ${index + 1}: ${_resultados[index] ?? "sin lanzar"}',
+                        'Dado ${index + 1}: ${resultados[index] ?? "sin lanzar"}',
                     child: ExcludeSemantics(
                       child: Text(
-                        'Dado ${index + 1}: ${_resultados[index] ?? "—"}',
+                        'Dado ${index + 1}: ${resultados[index] ?? "—"}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
@@ -154,15 +168,16 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
               spacing: 8,
               runSpacing: 8,
               children: [
-                FilledButton.icon(
-                  key: const Key('roll-dice-button'),
-                  onPressed:
-                      _controlador.isAnimating || !widget.puedeLanzar
-                      ? null
-                      : _lanzarDados,
-                  icon: const Icon(Icons.casino),
-                  label: const Text('Lanzar dados'),
-                ),
+                if (dadosDelServidor == null)
+                  FilledButton.icon(
+                    key: const Key('roll-dice-button'),
+                    onPressed:
+                        _controlador.isAnimating || !widget.puedeLanzar
+                        ? null
+                        : _lanzarDados,
+                    icon: const Icon(Icons.casino),
+                    label: const Text('Lanzar dados'),
+                  ),
                 if (mostrarSaltarTurno)
                   OutlinedButton(
                     key: const Key('skip-turn-button'),
@@ -174,8 +189,11 @@ class _LanzamientoDadosState extends State<LanzamientoDados>
             if (mostrarSaltarTurno) ...[
               const SizedBox(height: 8),
               Text(
-                'No hay movimientos posibles con esta tirada. '
-                'Salta el turno para volver a lanzar.',
+                dadosDelServidor == null
+                    ? 'No hay movimientos posibles con esta tirada. '
+                          'Salta el turno para volver a lanzar.'
+                    : 'No hay movimientos posibles con esta tirada. '
+                          'Salta el turno.',
                 key: const Key('no-moves-message'),
                 textAlign: TextAlign.center,
                 style: TextStyle(

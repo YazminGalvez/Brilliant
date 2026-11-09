@@ -12,6 +12,7 @@ import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
 import 'package:frontend/panel_historial_movimientos.dart';
 import 'package:frontend/partida_compartida.dart';
+import 'package:frontend/partidas.dart';
 import 'package:frontend/proveedor_autenticacion.dart';
 import 'package:frontend/seleccion_mapa.dart';
 import 'package:frontend/vigilante_sesion.dart';
@@ -110,6 +111,7 @@ class TableroPage extends StatefulWidget {
 class _TableroPageState extends State<TableroPage> {
   late final Partida _partida;
   OpcionAncla? _opcionAnclaSeleccionada;
+  int _rondaRegistrada = 0;
 
   @override
   void initState() {
@@ -117,13 +119,15 @@ class _TableroPageState extends State<TableroPage> {
     final compartida = widget.compartida;
     _partida =
         widget.partida ??
-        Partida(
-          mapa:
-              (compartida == null ? null : mapaDeLaSala(compartida.sala)) ??
-              mapaUno,
-        );
+        (compartida == null
+            ? Partida(mapa: mapaUno)
+            : Partida(
+                mapa: mapaDeLaSala(compartida.sala) ?? mapaUno,
+                permitirRelanzar: false,
+              ));
     if (compartida != null) {
       _colocarTableroEnviado(compartida.sala.miTablero);
+      _sincronizarRonda(compartida);
       compartida
         ..addListener(_alCambiarCompartida)
         ..iniciar();
@@ -145,7 +149,30 @@ class _TableroPageState extends State<TableroPage> {
       if (!_partida.inicializado) {
         _colocarTableroEnviado(compartida.sala.miTablero);
       }
+      _sincronizarRonda(compartida);
     });
+  }
+
+  void _sincronizarRonda(PartidaCompartida compartida) {
+    final ronda = compartida.sala.ronda;
+    if (ronda > 0 && _partida.puedeIniciar) _partida.iniciar();
+
+    final dados = compartida.resultado;
+    if (dados == null ||
+        !compartida.puedoJugarRonda ||
+        ronda <= _rondaRegistrada ||
+        !_partida.puedeLanzar) {
+      return;
+    }
+    _partida.registrarTirada(dados);
+    _rondaRegistrada = ronda;
+    _opcionAnclaSeleccionada = null;
+  }
+
+  int? _zonaCompletadaEn(int fila, int columna) {
+    final zona = _partida.tablero.zonaEn(fila, columna);
+    if (zona == null || !zona.verificarCompletado()) return null;
+    return zona.id + 1;
   }
 
   void _colocarTableroEnviado(List<int> numeros) {
@@ -258,6 +285,7 @@ class _TableroPageState extends State<TableroPage> {
       _partida.saltarTurno();
       _opcionAnclaSeleccionada = null;
     });
+    widget.compartida?.terminarTurno(tableroLleno: false);
   }
 
   void _confirmarMovimiento(int fila, int columna) {
@@ -268,6 +296,10 @@ class _TableroPageState extends State<TableroPage> {
       _partida.colocar(opcion, fila, columna);
       _opcionAnclaSeleccionada = null;
     });
+    widget.compartida?.terminarTurno(
+      tableroLleno: _partida.tablero.estaLleno,
+      zona: _zonaCompletadaEn(fila, columna),
+    );
   }
 
   Future<void> _editarCeldaInicial(int fila, int columna) async {
@@ -370,9 +402,14 @@ class _TableroPageState extends State<TableroPage> {
                     switch (_partida.estado) {
                       EstadoPartida.preparando =>
                         'Ingresa los números iniciales del 1 al 6',
+                      _ when compartida != null =>
+                        'Ronda ${compartida.sala.ronda}',
                       EstadoPartida.jugando => 'Partida en curso',
                       EstadoPartida.terminada => 'Fin del juego',
                     },
+                    key: compartida != null && enCurso
+                        ? const Key('multi-ronda')
+                        : null,
                     style: TextStyle(
                       fontSize: 15,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -382,7 +419,13 @@ class _TableroPageState extends State<TableroPage> {
                     const SizedBox(height: 12),
                     _construirMarcador(),
                   ],
-                  if (_partida.terminada) ...[
+                  if (enCurso && compartida != null) ...[
+                    const SizedBox(height: 12),
+                    _PanelRondaCompartida(
+                      compartida: compartida,
+                      tableroLleno: _partida.terminada,
+                    ),
+                  ] else if (_partida.terminada) ...[
                     const SizedBox(height: 12),
                     _construirFinDePartida(),
                   ],
@@ -502,13 +545,17 @@ class _TableroPageState extends State<TableroPage> {
                       final panelDados = enCurso
                           ? LanzamientoDados(
                               opciones: _opcionesVisibles,
-                              puedeLanzar: _partida.puedeLanzar,
+                              puedeLanzar:
+                                  compartida == null && _partida.puedeLanzar,
                               opcionSeleccionada: _opcionAnclaSeleccionada,
                               onAnclaSeleccionada: _seleccionarOpcionAncla,
-                              onTirada: _registrarTirada,
+                              onTirada: compartida == null
+                                  ? _registrarTirada
+                                  : null,
                               puedeSaltarTurno: _partida.puedeSaltarTurno,
                               onSaltarTurno: _saltarTurno,
                               random: widget.random,
+                              dadosDelServidor: compartida?.resultado,
                             )
                           : null;
                       final panelHistorial = enCurso
@@ -808,6 +855,112 @@ class _PanelTableroCompartido extends StatelessWidget {
                   ],
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelRondaCompartida extends StatelessWidget {
+  const _PanelRondaCompartida({
+    required this.compartida,
+    required this.tableroLleno,
+  });
+
+  final PartidaCompartida compartida;
+  final bool tableroLleno;
+
+  String _estadoDe(JugadorSala jugador) {
+    if (jugador.concedio) return 'Concedió';
+    final esYo = jugador.nombre == compartida.miNombre;
+    if (jugador.jugoRonda || (esYo && !compartida.puedoJugarRonda)) {
+      return 'Jugó';
+    }
+    return 'Pensando';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    final colores = tema.colorScheme;
+    final sala = compartida.sala;
+    final errorTurno = compartida.errorTurno;
+
+    final (titulo, clave) = switch (compartida) {
+      PartidaCompartida(cerrada: true) => (
+        'La partida se cerró.',
+        'multi-cerrada',
+      ),
+      PartidaCompartida(sala: SalaPartida(terminada: true)) => (
+        'La partida terminó.',
+        'multi-terminada',
+      ),
+      PartidaCompartida(puedoJugarRonda: true) => (
+        'Tu turno: elige un ancla y un destino, o salta el turno.',
+        'multi-tu-turno',
+      ),
+      _ => ('Esperando a los demás...', 'multi-esperando-ronda'),
+    };
+
+    return Card(
+      key: const Key('multi-jugadores'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(titulo, key: Key(clave), style: tema.textTheme.titleMedium),
+            if (tableroLleno && !sala.terminada && !compartida.cerrada) ...[
+              const SizedBox(height: 4),
+              const Text('Llenaste tu tablero.'),
+            ],
+            if (sala.terminada && sala.ganadores.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Ganó: ${sala.ganadores.join(', ')}',
+                key: const Key('multi-ganadores'),
+              ),
+            ],
+            if (errorTurno != null && compartida.avisoPendiente != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'No se pudo avisar tu turno: ${errorTurno.mensaje}',
+                key: const Key('multi-error-turno'),
+                style: TextStyle(color: colores.error),
+              ),
+            ],
+            const SizedBox(height: 8),
+            for (final jugador in sala.jugadores)
+              Padding(
+                key: Key('multi-jugador-${jugador.nombre}'),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        jugador.nombre == compartida.miNombre
+                            ? '${jugador.nombre} (tú)'
+                            : jugador.nombre,
+                      ),
+                    ),
+                    Text(
+                      _estadoDe(jugador),
+                      key: Key('multi-estado-${jugador.nombre}'),
+                      style: TextStyle(color: colores.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            if (compartida.cerrada || sala.terminada) ...[
+              const SizedBox(height: 8),
+              FilledButton(
+                key: const Key('multi-volver'),
+                onPressed: () => Navigator.of(context).maybePop(),
+                child: const Text('Volver'),
+              ),
+            ],
           ],
         ),
       ),

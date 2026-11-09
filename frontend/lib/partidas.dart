@@ -229,6 +229,17 @@ class ServicioPartidas {
         cuerpo: {'numeros': numeros},
       );
 
+  Future<SalaPartida> terminarTurno(
+    String codigo,
+    int ronda, {
+    required bool tableroLleno,
+    int? zona,
+  }) => _pedirSala(
+    'POST',
+    '${_rutaDeSala(codigo)}/turno',
+    cuerpo: {'ronda': ronda, 'tableroLleno': tableroLleno, 'zona': zona},
+  );
+
   Future<void> salir(String codigo) async {
     await autenticacion.enviarConSesion('POST', '${_rutaDeSala(codigo)}/salir');
   }

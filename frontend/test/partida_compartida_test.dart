@@ -24,7 +24,13 @@ class PartidasFalsas extends ServicioPartidas {
       SalaPartida.desdeJson(salaJson(comenzada: true));
   FutureOr<SalaPartida> Function(List<int> numeros) alEnviarTablero = (_) =>
       SalaPartida.desdeJson(salaJson(comenzada: true));
+  FutureOr<SalaPartida> Function(AvisoTurno aviso) alTerminarTurno = (aviso) =>
+      salaConJugadores([
+        jugador('ana', jugoRonda: true),
+        jugador('luis'),
+      ], ronda: aviso.ronda);
   final tablerosEnviados = <List<int>>[];
+  final turnosAvisados = <AvisoTurno>[];
 
   @override
   Future<SalaPartida> consultar(String codigo) async => alConsultar(codigo);
@@ -34,29 +40,63 @@ class PartidasFalsas extends ServicioPartidas {
     tablerosEnviados.add(numeros);
     return alEnviarTablero(numeros);
   }
+
+  @override
+  Future<SalaPartida> terminarTurno(
+    String codigo,
+    int ronda, {
+    required bool tableroLleno,
+    int? zona,
+  }) async {
+    final aviso = AvisoTurno(
+      ronda: ronda,
+      tableroLleno: tableroLleno,
+      zona: zona,
+    );
+    turnosAvisados.add(aviso);
+    return alTerminarTurno(aviso);
+  }
 }
 
 Map<String, Object?> jugador(
   String nombre, {
   bool tableroListo = false,
   bool concedio = false,
+  bool jugoRonda = false,
 }) => {
   'nombre': nombre,
   'listo': true,
   'tableroListo': tableroListo,
   'conectado': true,
   'concedio': concedio,
-  'jugoRonda': false,
+  'jugoRonda': jugoRonda,
 };
 
 SalaPartida salaConJugadores(
   List<Map<String, Object?>> jugadores, {
   List<int> miTablero = const [],
+  int ronda = 0,
+  bool terminada = false,
 }) => SalaPartida.desdeJson(
   salaJson(
     comenzada: true,
-    cambios: {'jugadores': jugadores, 'miTablero': miTablero},
+    ronda: ronda,
+    cambios: {
+      'jugadores': jugadores,
+      'miTablero': miTablero,
+      'terminada': terminada,
+    },
   ),
+);
+
+SalaPartida rondaDeAnaYLuis(int ronda, {bool anaJugo = false}) =>
+    salaConJugadores([
+      jugador('ana', tableroListo: true, jugoRonda: anaJugo),
+      jugador('luis', tableroListo: true),
+    ], ronda: ronda);
+
+const errorDeConexion = ErrorAutenticacion(
+  'No se pudo conectar con el servidor.',
 );
 
 void main() {
@@ -289,6 +329,234 @@ void main() {
       expect(compartida.cerrada, isTrue);
       expect(compartida.activa, isFalse);
       compartida.dispose();
+    });
+  });
+
+  group('Puedo jugar la ronda', () {
+    test('No se juega antes de la primera ronda', () {
+      final compartida = compartidaCon(rondaDeAnaYLuis(0));
+
+      expect(compartida.resultado, isNull);
+      expect(compartida.puedoJugarRonda, isFalse);
+      expect(compartida.esperandoALosDemas, isFalse);
+    });
+
+    test('En una ronda con dados y sin haber jugado se puede jugar', () {
+      final compartida = compartidaCon(rondaDeAnaYLuis(1));
+
+      expect(compartida.resultado, [3, 5]);
+      expect(compartida.puedoJugarRonda, isTrue);
+      expect(compartida.esperandoALosDemas, isFalse);
+    });
+
+    test('Si el servidor dice que ya jugué la ronda no se puede jugar', () {
+      final compartida = compartidaCon(rondaDeAnaYLuis(1, anaJugo: true));
+
+      expect(compartida.puedoJugarRonda, isFalse);
+      expect(compartida.esperandoALosDemas, isTrue);
+    });
+
+    test('Una partida terminada no se puede jugar', () {
+      final compartida = compartidaCon(
+        salaConJugadores([jugador('ana')], ronda: 5, terminada: true),
+      );
+
+      expect(compartida.puedoJugarRonda, isFalse);
+    });
+
+    test('Quien concedió no puede jugar la ronda', () {
+      final compartida = compartidaCon(
+        salaConJugadores([jugador('ana', concedio: true)], ronda: 2),
+      );
+
+      expect(compartida.puedoJugarRonda, isFalse);
+    });
+  });
+
+  group('Aviso de turno', () {
+    test('Avisa la ronda en curso con la zona y el tablero lleno', () async {
+      final compartida = compartidaCon(rondaDeAnaYLuis(2));
+
+      compartida.terminarTurno(tableroLleno: false, zona: 4);
+      await pumpEventQueue();
+
+      final aviso = partidas.turnosAvisados.single;
+      expect(aviso.ronda, 2);
+      expect(aviso.tableroLleno, isFalse);
+      expect(aviso.zona, 4);
+      expect(compartida.avisoPendiente, isNull);
+      expect(compartida.puedoJugarRonda, isFalse);
+    });
+
+    test('Mientras se envía el aviso ya no se puede jugar la ronda', () async {
+      final espera = Completer<SalaPartida>();
+      partidas.alTerminarTurno = (_) => espera.future;
+      final compartida = compartidaCon(rondaDeAnaYLuis(1));
+
+      compartida.terminarTurno(tableroLleno: false);
+
+      expect(compartida.avisoPendiente?.ronda, 1);
+      expect(compartida.puedoJugarRonda, isFalse);
+      expect(compartida.esperandoALosDemas, isTrue);
+      espera.complete(rondaDeAnaYLuis(1, anaJugo: true));
+      await pumpEventQueue();
+      expect(compartida.avisoPendiente, isNull);
+    });
+
+    test('No avisa dos veces la misma ronda', () async {
+      final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+      compartida.terminarTurno(tableroLleno: false);
+      compartida.terminarTurno(tableroLleno: false, zona: 2);
+      await pumpEventQueue();
+      compartida.terminarTurno(tableroLleno: true);
+      await pumpEventQueue();
+
+      expect(partidas.turnosAvisados, hasLength(1));
+      expect(partidas.turnosAvisados.single.zona, isNull);
+    });
+
+    test(
+      'Aunque la respuesta traiga la misma ronda sin marcar, no repite el aviso',
+      () async {
+        partidas.alTerminarTurno = (_) => rondaDeAnaYLuis(3);
+        final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+        compartida.terminarTurno(tableroLleno: false);
+        await pumpEventQueue();
+        compartida.terminarTurno(tableroLleno: false);
+        await pumpEventQueue();
+
+        expect(partidas.turnosAvisados, hasLength(1));
+        expect(compartida.puedoJugarRonda, isFalse);
+      },
+    );
+
+    test('En la ronda siguiente se puede volver a jugar y avisar', () async {
+      partidas.alTerminarTurno = (aviso) => rondaDeAnaYLuis(aviso.ronda + 1);
+      final compartida = compartidaCon(rondaDeAnaYLuis(1));
+
+      compartida.terminarTurno(tableroLleno: false);
+      await pumpEventQueue();
+
+      expect(compartida.sala.ronda, 2);
+      expect(compartida.puedoJugarRonda, isTrue);
+      compartida.terminarTurno(tableroLleno: false);
+      await pumpEventQueue();
+      expect(partidas.turnosAvisados.map((aviso) => aviso.ronda), [1, 2]);
+    });
+
+    test('Con el tablero lleno ya no se juegan más rondas', () async {
+      partidas.alTerminarTurno = (aviso) => rondaDeAnaYLuis(aviso.ronda + 1);
+      final compartida = compartidaCon(rondaDeAnaYLuis(6));
+
+      compartida.terminarTurno(tableroLleno: true, zona: 1);
+      await pumpEventQueue();
+
+      expect(compartida.sala.ronda, 7);
+      expect(compartida.puedoJugarRonda, isFalse);
+    });
+
+    testWidgets('Si el aviso falla por la red lo reintenta hasta que llega', (
+      tester,
+    ) async {
+      var fallos = 2;
+      partidas.alTerminarTurno = (aviso) {
+        if (fallos > 0) {
+          fallos--;
+          throw errorDeConexion;
+        }
+        return rondaDeAnaYLuis(aviso.ronda + 1);
+      };
+      final compartida = PartidaCompartida(
+        partidas: partidas,
+        salaInicial: rondaDeAnaYLuis(1),
+      );
+
+      compartida.terminarTurno(tableroLleno: false, zona: 3);
+      await tester.pump();
+
+      expect(partidas.turnosAvisados, hasLength(1));
+      expect(compartida.avisoPendiente?.ronda, 1);
+      expect(compartida.errorTurno, errorDeConexion);
+      expect(compartida.puedoJugarRonda, isFalse);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(partidas.turnosAvisados, hasLength(2));
+      expect(compartida.avisoPendiente, isNotNull);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(partidas.turnosAvisados, hasLength(3));
+      expect(partidas.turnosAvisados.every((aviso) => aviso.zona == 3), isTrue);
+      expect(compartida.avisoPendiente, isNull);
+      expect(compartida.errorTurno, isNull);
+      expect(compartida.sala.ronda, 2);
+
+      await tester.pump(const Duration(seconds: 10));
+      expect(partidas.turnosAvisados, hasLength(3));
+      compartida.dispose();
+    });
+
+    testWidgets('Si la sala ya muestra que jugué, deja de reintentar', (
+      tester,
+    ) async {
+      partidas.alTerminarTurno = (_) => throw errorDeConexion;
+      partidas.alConsultar = (_) => rondaDeAnaYLuis(1, anaJugo: true);
+      final compartida = PartidaCompartida(
+        partidas: partidas,
+        salaInicial: rondaDeAnaYLuis(1),
+        intervalo: const Duration(seconds: 1),
+        esperaReintento: const Duration(seconds: 5),
+      )..iniciar();
+
+      compartida.terminarTurno(tableroLleno: false);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(compartida.avisoPendiente, isNull);
+      await tester.pump(const Duration(seconds: 10));
+      expect(partidas.turnosAvisados, hasLength(1));
+      expect(compartida.puedoJugarRonda, isFalse);
+      compartida.dispose();
+    });
+
+    testWidgets(
+      'Un rechazo del servidor no se da por enviado ni se repite solo',
+      (tester) async {
+        partidas.alTerminarTurno = (_) => throw const ErrorAutenticacion(
+          'Los datos de la partida no son válidos.',
+          codigo: 400,
+          codigoServidor: 'DATOS_INVALIDOS',
+        );
+        final compartida = PartidaCompartida(
+          partidas: partidas,
+          salaInicial: rondaDeAnaYLuis(1),
+        );
+
+        compartida.terminarTurno(tableroLleno: false, zona: 99);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 10));
+
+        expect(partidas.turnosAvisados, hasLength(1));
+        expect(compartida.avisoPendiente?.ronda, 1);
+        expect(compartida.errorTurno?.codigoServidor, 'DATOS_INVALIDOS');
+        compartida.dispose();
+      },
+    );
+
+    test('Si la partida ya no existe al avisar queda cerrada', () async {
+      partidas.alTerminarTurno = (_) => throw const ErrorAutenticacion(
+        'Esa partida ya no existe.',
+        codigo: 404,
+        codigoServidor: 'PARTIDA_NO_ENCONTRADA',
+      );
+      final compartida = compartidaCon(rondaDeAnaYLuis(1));
+
+      compartida.terminarTurno(tableroLleno: false);
+      await pumpEventQueue();
+
+      expect(compartida.cerrada, isTrue);
+      expect(compartida.puedoJugarRonda, isFalse);
     });
   });
 

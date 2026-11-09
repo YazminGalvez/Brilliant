@@ -566,6 +566,115 @@ void main() {
     });
   });
 
+  group('Terminar el turno', () {
+    test(
+      'Manda la ronda, el tablero lleno y la zona a la ruta del turno',
+      () async {
+        final peticiones = <http.Request>[];
+        final partidas = await partidasQueResponden(
+          (_) => respuestaJson(salaJson(ronda: 3, comenzada: true), 200),
+          peticiones: peticiones,
+        );
+
+        await partidas.terminarTurno('K7M2QX', 3, tableroLleno: false, zona: 5);
+
+        final peticion = peticiones.single;
+        expect(peticion.method, 'POST');
+        expect(
+          peticion.url.toString(),
+          '$servidorDePrueba/api/v1/partidas/K7M2QX/turno',
+        );
+        expect(peticion.headers['Authorization'], 'Bearer token-de-prueba');
+        expect(cuerpoDe(peticion), {
+          'ronda': 3,
+          'tableroLleno': false,
+          'zona': 5,
+        });
+      },
+    );
+
+    test('Sin zona completada manda zona null', () async {
+      final peticiones = <http.Request>[];
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(salaJson(ronda: 7, comenzada: true), 200),
+        peticiones: peticiones,
+      );
+
+      await partidas.terminarTurno('K7M2QX', 7, tableroLleno: true);
+
+      expect(cuerpoDe(peticiones.single), {
+        'ronda': 7,
+        'tableroLleno': true,
+        'zona': null,
+      });
+    });
+
+    test('Devuelve la sala de la ronda siguiente', () async {
+      final partidas = await partidasQueResponden(
+        (_) => respuestaJson(salaJson(ronda: 4, comenzada: true), 200),
+      );
+
+      final sala = await partidas.terminarTurno(
+        'K7M2QX',
+        3,
+        tableroLleno: false,
+      );
+
+      expect(sala.ronda, 4);
+      expect(sala.dados, [3, 5]);
+    });
+
+    test('Una zona fuera del mapa da DATOS_INVALIDOS', () async {
+      final partidas = await partidasQueResponden(
+        (_) => errorDelServidor('DATOS_INVALIDOS', 400),
+      );
+
+      await expectLater(
+        partidas.terminarTurno('K7M2QX', 1, tableroLleno: false, zona: 99),
+        throwsA(
+          errorDePartida(
+            'Los datos de la partida no son válidos.',
+            codigoServidor: 'DATOS_INVALIDOS',
+          ),
+        ),
+      );
+    });
+
+    test('Terminar el turno sin conexión usa el mensaje de conexión', () async {
+      final partidas = await partidasQueResponden(
+        (_) => throw http.ClientException('Connection refused'),
+      );
+
+      await expectLater(
+        partidas.terminarTurno('K7M2QX', 1, tableroLleno: false),
+        throwsA(errorDePartida(ClienteAutenticacion.mensajeConexion)),
+      );
+    });
+
+    test('Terminar el turno sin sesión no llama al servidor', () async {
+      final servidor = ServidorDePartidasFalso(
+        (_) => respuestaJson(salaJson(), 200),
+      );
+      final autenticacion = ClienteAutenticacion(
+        servidor: servidorDePrueba,
+        cliente: servidor.cliente,
+      );
+
+      await expectLater(
+        ServicioPartidas(
+          autenticacion,
+        ).terminarTurno('K7M2QX', 1, tableroLleno: false),
+        throwsA(
+          errorDePartida(
+            'Tu sesión terminó. Inicia sesión de nuevo.',
+            codigoServidor: 'NO_AUTORIZADO',
+          ),
+        ),
+      );
+      expect(servidor.peticiones, isEmpty);
+    });
+  });
+
   group('Salir de la sala', () {
     test(
       'Salir manda POST a la ruta de salir de la sala con el token',
