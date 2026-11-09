@@ -888,6 +888,220 @@ void main() {
     });
   });
 
+  group('Desconexiones de la partida compartida', () {
+    PartidaCompartida vigilada(
+      SalaPartida sala, {
+      Duration esperaReintento = const Duration(seconds: 2),
+    }) => PartidaCompartida(
+      partidas: partidas,
+      salaInicial: sala,
+      esperaReintento: esperaReintento,
+    )..iniciar();
+
+    testWidgets(
+      'Avisa que no hay conexión tras 2 fallos seguidos y deja de avisar al volver',
+      (tester) async {
+        var hayRed = false;
+        partidas.alConsultar = (_) =>
+            hayRed ? rondaDeAnaYLuis(1) : throw errorDeConexion;
+        final compartida = vigilada(rondaDeAnaYLuis(1));
+        var avisos = 0;
+        compartida.addListener(() => avisos++);
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(compartida.sinConexion, isFalse);
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(compartida.sinConexion, isTrue);
+        expect(avisos, 1);
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(compartida.sinConexion, isTrue);
+        expect(compartida.activa, isTrue);
+
+        hayRed = true;
+        await tester.pump(const Duration(seconds: 2));
+        expect(compartida.sinConexion, isFalse);
+        expect(avisos, 2);
+        compartida.dispose();
+      },
+    );
+
+    testWidgets('Un fallo suelto entre consultas buenas no avisa', (
+      tester,
+    ) async {
+      var consultas = 0;
+      partidas.alConsultar = (_) =>
+          (++consultas).isOdd ? throw errorDeConexion : rondaDeAnaYLuis(1);
+      final compartida = vigilada(rondaDeAnaYLuis(1));
+
+      for (var vez = 0; vez < 4; vez++) {
+        await tester.pump(const Duration(seconds: 2));
+        expect(compartida.sinConexion, isFalse);
+      }
+      expect(consultas, 4);
+      compartida.dispose();
+    });
+
+    testWidgets(
+      'Al volver la conexión reenvía enseguida el aviso de turno pendiente',
+      (tester) async {
+        var hayRed = false;
+        partidas.alConsultar = (_) =>
+            hayRed ? rondaDeAnaYLuis(1) : throw errorDeConexion;
+        partidas.alTerminarTurno = (aviso) =>
+            hayRed ? rondaDeAnaYLuis(1, anaJugo: true) : throw errorDeConexion;
+        final compartida = vigilada(
+          rondaDeAnaYLuis(1),
+          esperaReintento: const Duration(minutes: 1),
+        );
+
+        compartida.terminarTurno(tableroLleno: false, zona: 4);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 4));
+        expect(compartida.sinConexion, isTrue);
+        expect(compartida.avisoPendiente?.ronda, 1);
+        expect(partidas.turnosAvisados, hasLength(1));
+
+        hayRed = true;
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(partidas.turnosAvisados, hasLength(2));
+        expect(partidas.turnosAvisados.last.zona, 4);
+        expect(compartida.avisoPendiente, isNull);
+        expect(compartida.errorTurno, isNull);
+        expect(compartida.sinConexion, isFalse);
+
+        await tester.pump(const Duration(minutes: 2));
+        expect(partidas.turnosAvisados, hasLength(2));
+        compartida.dispose();
+      },
+    );
+
+    testWidgets('Un aviso rechazado no se reenvía en cada consulta', (
+      tester,
+    ) async {
+      partidas.alTerminarTurno = (_) => throw const ErrorAutenticacion(
+        'Los datos de la partida no son válidos.',
+        codigo: 400,
+        codigoServidor: 'DATOS_INVALIDOS',
+      );
+      partidas.alConsultar = (_) => rondaDeAnaYLuis(1);
+      final compartida = vigilada(rondaDeAnaYLuis(1));
+
+      compartida.terminarTurno(tableroLleno: false);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 10));
+
+      expect(partidas.turnosAvisados, hasLength(1));
+      compartida.dispose();
+    });
+
+    testWidgets(
+      'Si al volver la partida ya no existe queda cerrada y sin la franja',
+      (tester) async {
+        var existe = true;
+        partidas.alConsultar = (_) => existe
+            ? throw errorDeConexion
+            : throw const ErrorAutenticacion(
+                'Esa partida ya no existe.',
+                codigo: 404,
+                codigoServidor: 'PARTIDA_NO_ENCONTRADA',
+              );
+        final compartida = vigilada(rondaDeAnaYLuis(2));
+
+        await tester.pump(const Duration(seconds: 4));
+        expect(compartida.sinConexion, isTrue);
+
+        existe = false;
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(compartida.cerrada, isTrue);
+        expect(compartida.sinConexion, isFalse);
+        expect(compartida.activa, isFalse);
+        expect(compartida.salioPorInactividad, isFalse);
+        compartida.dispose();
+      },
+    );
+
+    testWidgets(
+      'Si el servidor me sacó por inactividad, sale con el resultado y sin jugar',
+      (tester) async {
+        partidas.alTerminarTurno = (_) => throw errorDeConexion;
+        partidas.alConsultar = (_) => SalaPartida.desdeJson(
+          salaJson(
+            comenzada: true,
+            ronda: 3,
+            cambios: {
+              'jugadores': [
+                jugador('ana', tableroListo: true, concedio: true),
+                jugador('luis', tableroListo: true),
+                jugador('eva', tableroListo: true),
+              ],
+              'puntos': {'ana': 4, 'luis': 9, 'eva': 6},
+            },
+          ),
+        );
+        final compartida = vigilada(
+          salaConJugadores([
+            jugador('ana', tableroListo: true),
+            jugador('luis', tableroListo: true),
+            jugador('eva', tableroListo: true),
+          ], ronda: 3),
+          esperaReintento: const Duration(minutes: 1),
+        );
+        compartida.terminarTurno(tableroLleno: false);
+        await tester.pump();
+
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(compartida.salioPorInactividad, isTrue);
+        expect(compartida.concedi, isTrue);
+        expect(compartida.puedoJugarRonda, isFalse);
+        expect(compartida.puedoConceder, isFalse);
+        expect(compartida.avisoPendiente, isNull);
+        expect(compartida.activa, isFalse);
+        expect(compartida.cerrada, isFalse);
+        expect(compartida.clasificacion.map((entrada) => entrada.key), [
+          'luis',
+          'eva',
+          'ana',
+        ]);
+        expect(partidas.autenticacion.sesion?.nombre, 'ana');
+
+        await tester.pump(const Duration(minutes: 2));
+        expect(partidas.turnosAvisados, hasLength(1));
+        compartida.dispose();
+      },
+    );
+
+    test(
+      'Conceder por mi cuenta no cuenta como salir por inactividad',
+      () async {
+        final compartida = compartidaCon(rondaDeAnaYLuis(3));
+
+        await compartida.conceder();
+
+        expect(compartida.concedi, isTrue);
+        expect(compartida.salioPorInactividad, isFalse);
+      },
+    );
+
+    test(
+      'Una sala que ya llega con mi concesión no cuenta como inactividad',
+      () {
+        final compartida = compartidaCon(
+          salaConJugadores([
+            jugador('ana', concedio: true),
+            jugador('luis'),
+          ], ronda: 4),
+        );
+
+        expect(compartida.salioPorInactividad, isFalse);
+      },
+    );
+  });
+
   test('El mapa de la sala es el mapa disponible con ese número', () {
     final sala = salaConJugadores([jugador('ana')]);
 

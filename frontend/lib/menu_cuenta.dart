@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/autenticacion.dart';
+import 'package:frontend/partidas.dart';
 import 'package:frontend/proveedor_autenticacion.dart';
 import 'package:frontend/vigilante_sesion.dart';
 
@@ -8,14 +9,39 @@ enum _AccionCuenta { cerrarSesion, borrarCuenta }
 class BotonCuenta extends StatelessWidget {
   const BotonCuenta({required this.proveedor, super.key});
 
+  static const avisoPartidaEnJuego =
+      'Estás en una partida; se concederá si cierras sesión.';
+
   final ProveedorAutenticacion proveedor;
 
+  Future<SalaPartida?> _partidaEnJuego() async {
+    final nombre = proveedor.servicio.sesion?.nombre;
+    try {
+      final sala = await ServicioPartidas(proveedor.servicio).actual();
+      if (sala == null || !sala.comenzada || sala.terminada) return null;
+      final sigoJugando = sala.jugadores.any(
+        (jugador) => jugador.nombre == nombre && !jugador.concedio,
+      );
+      return sigoJugando ? sala : null;
+    } on Object {
+      return null;
+    }
+  }
+
   Future<void> _cerrarSesion(BuildContext context, String nombre) async {
+    final partida = _partidaEnJuego();
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (contexto) => AlertDialog(
         title: const Text('Cerrar sesión'),
-        content: Text('¿Quieres cerrar la sesión de $nombre?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('¿Quieres cerrar la sesión de $nombre?'),
+            _AvisoPartidaEnJuego(partida: partida),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(contexto).pop(false),
@@ -31,6 +57,7 @@ class BotonCuenta extends StatelessWidget {
     );
     if (confirmar != true || !context.mounted) return;
 
+    await _concederSiHaceFalta(proveedor.servicio, partida);
     try {
       await proveedor.servicio.cerrarSesion();
     } catch (_) {}
@@ -39,9 +66,11 @@ class BotonCuenta extends StatelessWidget {
   }
 
   Future<void> _borrarCuenta(BuildContext context) async {
+    final partida = _partidaEnJuego();
     final borrada = await showDialog<bool>(
       context: context,
-      builder: (_) => _DialogoBorrarCuenta(servicio: proveedor.servicio),
+      builder: (_) =>
+          _DialogoBorrarCuenta(servicio: proveedor.servicio, partida: partida),
     );
     if (!context.mounted) return;
 
@@ -95,9 +124,10 @@ class BotonCuenta extends StatelessWidget {
 }
 
 class _DialogoBorrarCuenta extends StatefulWidget {
-  const _DialogoBorrarCuenta({required this.servicio});
+  const _DialogoBorrarCuenta({required this.servicio, required this.partida});
 
   final ServicioAutenticacion servicio;
+  final Future<SalaPartida?> partida;
 
   @override
   State<_DialogoBorrarCuenta> createState() => _DialogoBorrarCuentaState();
@@ -107,6 +137,7 @@ class _DialogoBorrarCuentaState extends State<_DialogoBorrarCuenta> {
   final _contrasena = TextEditingController();
 
   bool _enviando = false;
+  bool _concedida = false;
   String? _error;
 
   @override
@@ -128,6 +159,10 @@ class _DialogoBorrarCuentaState extends State<_DialogoBorrarCuenta> {
     });
 
     try {
+      if (!_concedida) {
+        _concedida = true;
+        await _concederSiHaceFalta(widget.servicio, widget.partida);
+      }
       await widget.servicio.borrarCuenta(_contrasena.text);
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -170,6 +205,7 @@ class _DialogoBorrarCuentaState extends State<_DialogoBorrarCuenta> {
               'Tu cuenta se eliminará de forma permanente y no se podrá '
               'recuperar. Escribe tu contraseña para confirmar.',
             ),
+            _AvisoPartidaEnJuego(partida: widget.partida),
             const SizedBox(height: 16),
             TextField(
               key: const Key('borrar-contrasena'),
@@ -226,6 +262,45 @@ class _DialogoBorrarCuentaState extends State<_DialogoBorrarCuenta> {
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _concederSiHaceFalta(
+  ServicioAutenticacion servicio,
+  Future<SalaPartida?> partida,
+) async {
+  try {
+    final sala = await partida;
+    if (sala != null) await ServicioPartidas(servicio).conceder(sala.codigo);
+  } on Object {
+    return;
+  }
+}
+
+class _AvisoPartidaEnJuego extends StatelessWidget {
+  const _AvisoPartidaEnJuego({required this.partida});
+
+  final Future<SalaPartida?> partida;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SalaPartida?>(
+      future: partida,
+      builder: (context, estado) {
+        if (estado.data == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text(
+            BotonCuenta.avisoPartidaEnJuego,
+            key: const Key('cuenta-aviso-partida'),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -3,7 +3,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:frontend/crear_partida.dart';
 import 'package:frontend/inicio_sesion.dart';
+import 'package:frontend/main.dart';
+import 'package:frontend/partida_compartida.dart';
 import 'package:frontend/partidas.dart';
+import 'package:frontend/sala_espera.dart';
 import 'package:frontend/unirse_partida.dart';
 
 class PantallaClara extends StatelessWidget {
@@ -46,18 +49,96 @@ class PantallaClara extends StatelessWidget {
   }
 }
 
-class MultijugadorPage extends StatelessWidget {
-  const MultijugadorPage({required this.partidas, super.key});
+class MultijugadorPage extends StatefulWidget {
+  const MultijugadorPage({
+    required this.partidas,
+    this.intervalo = const Duration(seconds: 2),
+    super.key,
+  });
 
   final ServicioPartidas partidas;
+  final Duration intervalo;
+
+  @override
+  State<MultijugadorPage> createState() => _MultijugadorPageState();
+}
+
+class _MultijugadorPageState extends State<MultijugadorPage> {
+  SalaPartida? _salaActual;
+
+  ServicioPartidas get partidas => widget.partidas;
+
+  @override
+  void initState() {
+    super.initState();
+    _buscarPartidaActual();
+  }
+
+  Future<void> _buscarPartidaActual() async {
+    SalaPartida? sala;
+    try {
+      sala = await partidas.actual();
+    } on Object {
+      sala = null;
+    }
+    if (!mounted) return;
+    setState(
+      () => _salaActual = sala != null && _sePuedeVolver(sala) ? sala : null,
+    );
+  }
+
+  bool _sePuedeVolver(SalaPartida sala) {
+    if (!sala.comenzada) return true;
+    if (sala.terminada) return false;
+    final nombre = partidas.autenticacion.sesion?.nombre;
+    return sala.jugadores.any(
+      (jugador) => jugador.nombre == nombre && !jugador.concedio,
+    );
+  }
+
+  Future<void> _abrir(WidgetBuilder pagina) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: pagina));
+    if (mounted) await _buscarPartidaActual();
+  }
+
+  void _volverAPartida(SalaPartida sala) {
+    _abrir(
+      (_) => sala.comenzada
+          ? TableroPage(
+              compartida: PartidaCompartida(
+                partidas: partidas,
+                salaInicial: sala,
+                intervalo: widget.intervalo,
+              ),
+            )
+          : SalaEsperaPage(
+              partidas: partidas,
+              salaInicial: sala,
+              intervalo: widget.intervalo,
+            ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
+    final salaActual = _salaActual;
 
     return PantallaClara(
       titulo: 'Jugar con amigos',
       children: [
+        if (salaActual != null) ...[
+          FilledButton.tonalIcon(
+            key: const Key('multi-volver'),
+            onPressed: () => _volverAPartida(salaActual),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Volver a tu partida'),
+          ),
+          const SizedBox(height: 24),
+        ],
         const MarcaDelJuego(),
         const SizedBox(height: 24),
         Text(
@@ -78,11 +159,7 @@ class MultijugadorPage extends StatelessWidget {
         const SizedBox(height: 24),
         FilledButton.icon(
           key: const Key('multi-crear'),
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => CrearPartidaPage(partidas: partidas),
-            ),
-          ),
+          onPressed: () => _abrir((_) => CrearPartidaPage(partidas: partidas)),
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           icon: const Icon(Icons.add),
           label: const Text('Crear partida'),
@@ -90,11 +167,8 @@ class MultijugadorPage extends StatelessWidget {
         const SizedBox(height: 12),
         OutlinedButton.icon(
           key: const Key('multi-unirse'),
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => UnirseConCodigoPage(partidas: partidas),
-            ),
-          ),
+          onPressed: () =>
+              _abrir((_) => UnirseConCodigoPage(partidas: partidas)),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
           ),

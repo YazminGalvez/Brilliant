@@ -469,6 +469,10 @@ class _TableroPageState extends State<TableroPage> {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (compartida != null && compartida.sinConexion) ...[
+                    const SizedBox(height: 12),
+                    const _FranjaSinConexion(),
+                  ],
                   if (enCurso) ...[
                     const SizedBox(height: 12),
                     _construirMarcador(),
@@ -866,32 +870,38 @@ class _PanelTableroCompartido extends StatelessWidget {
               Padding(
                 key: Key('multi-jugador-${jugador.nombre}'),
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      jugador.tableroListo
-                          ? Icons.check_circle_outline
-                          : Icons.hourglass_empty,
-                      size: 20,
-                      color: jugador.tableroListo
-                          ? const Color(0xFF15803D)
-                          : colores.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        jugador.nombre == compartida.miNombre
-                            ? '${jugador.nombre} (tú)'
-                            : jugador.nombre,
+                child: Opacity(
+                  opacity: _seDesconecto(compartida, jugador.nombre) ? 0.5 : 1,
+                  child: Row(
+                    children: [
+                      Icon(
+                        jugador.tableroListo
+                            ? Icons.check_circle_outline
+                            : Icons.hourglass_empty,
+                        size: 20,
+                        color: jugador.tableroListo
+                            ? const Color(0xFF15803D)
+                            : colores.onSurfaceVariant,
                       ),
-                    ),
-                    Text(
-                      jugador.tableroListo
-                          ? 'Tablero listo'
-                          : 'Colocando números',
-                      style: TextStyle(color: colores.onSurfaceVariant),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          jugador.nombre == compartida.miNombre
+                              ? '${jugador.nombre} (tú)'
+                              : jugador.nombre,
+                        ),
+                      ),
+                      if (_seDesconecto(compartida, jugador.nombre))
+                        _SinConexion(nombre: jugador.nombre)
+                      else
+                        Text(
+                          jugador.tableroListo
+                              ? 'Tablero listo'
+                              : 'Colocando números',
+                          style: TextStyle(color: colores.onSurfaceVariant),
+                        ),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -899,6 +909,61 @@ class _PanelTableroCompartido extends StatelessWidget {
       ),
     );
   }
+}
+
+class _FranjaSinConexion extends StatelessWidget {
+  const _FranjaSinConexion();
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('multi-sin-conexion'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: colores.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off, size: 20, color: colores.onErrorContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Sin conexión con el servidor. Reintentando...',
+              style: TextStyle(color: colores.onErrorContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SinConexion extends StatelessWidget {
+  const _SinConexion({required this.nombre});
+
+  final String nombre;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Sin conexión',
+      key: Key('jugador-sin-conexion-$nombre'),
+      style: TextStyle(color: Theme.of(context).colorScheme.error),
+    );
+  }
+}
+
+bool _seDesconecto(PartidaCompartida compartida, String nombre) {
+  if (nombre == compartida.miNombre) return false;
+  for (final jugador in compartida.sala.jugadores) {
+    if (jugador.nombre == nombre) {
+      return !jugador.conectado && !jugador.concedio;
+    }
+  }
+  return false;
 }
 
 void _volverAlMenu(BuildContext context, PartidaCompartida compartida) {
@@ -939,10 +1004,15 @@ class _PartidaNoDisponible extends StatelessWidget {
 }
 
 class _ListaDePuntos extends StatelessWidget {
-  const _ListaDePuntos({required this.compartida, required this.estadoDe});
+  const _ListaDePuntos({
+    required this.compartida,
+    required this.estadoDe,
+    this.mostrarConexion = false,
+  });
 
   final PartidaCompartida compartida;
   final String? Function(String nombre) estadoDe;
+  final bool mostrarConexion;
 
   @override
   Widget build(BuildContext context) {
@@ -959,6 +1029,9 @@ class _ListaDePuntos extends StatelessWidget {
             puntos: clasificacion[posicion].value,
             esYo: clasificacion[posicion].key == compartida.miNombre,
             estado: estadoDe(clasificacion[posicion].key),
+            sinConexion:
+                mostrarConexion &&
+                _seDesconecto(compartida, clasificacion[posicion].key),
             colores: colores,
           ),
       ],
@@ -973,6 +1046,7 @@ class _FilaDePuntos extends StatelessWidget {
     required this.puntos,
     required this.esYo,
     required this.estado,
+    required this.sinConexion,
     required this.colores,
   });
 
@@ -981,12 +1055,13 @@ class _FilaDePuntos extends StatelessWidget {
   final int puntos;
   final bool esYo;
   final String? estado;
+  final bool sinConexion;
   final ColorScheme colores;
 
   @override
   Widget build(BuildContext context) {
     final estado = this.estado;
-    return Container(
+    final fila = Container(
       key: Key('multi-jugador-$nombre'),
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1003,7 +1078,10 @@ class _FilaDePuntos extends StatelessWidget {
               style: TextStyle(fontWeight: esYo ? FontWeight.w700 : null),
             ),
           ),
-          if (estado != null) ...[
+          if (sinConexion) ...[
+            _SinConexion(nombre: nombre),
+            const SizedBox(width: 12),
+          ] else if (estado != null) ...[
             Text(
               estado,
               key: Key('multi-estado-$nombre'),
@@ -1021,6 +1099,7 @@ class _FilaDePuntos extends StatelessWidget {
         ],
       ),
     );
+    return sinConexion ? Opacity(opacity: 0.5, child: fila) : fila;
   }
 }
 
@@ -1101,7 +1180,11 @@ class _PanelRondaCompartida extends StatelessWidget {
               style: TextStyle(color: colores.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
-            _ListaDePuntos(compartida: compartida, estadoDe: _estadoDe),
+            _ListaDePuntos(
+              compartida: compartida,
+              estadoDe: _estadoDe,
+              mostrarConexion: true,
+            ),
           ],
         ),
       ),
@@ -1129,6 +1212,8 @@ class _PanelFinPartida extends StatelessWidget {
     final ganePorAbandono =
         compartida.gane && sala.motivoFin == SalaPartida.motivoAbandono;
     final titulo = switch (compartida) {
+      PartidaCompartida(salioPorInactividad: true) =>
+        'Saliste de la partida por inactividad.',
       PartidaCompartida(concedi: true) => 'Concediste la partida.',
       _ when ganePorAbandono => 'Ganaste: los demás concedieron.',
       PartidaCompartida(gane: true) => '¡Ganaste!',

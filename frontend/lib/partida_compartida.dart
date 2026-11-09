@@ -40,6 +40,8 @@ class PartidaCompartida extends ChangeNotifier {
       salaInicial: salaInicial,
       intervalo: intervalo,
       alCambiar: _recibirSala,
+      alResponder: _alResponder,
+      alFallar: _alFallar,
       alCerrar: () {
         _cerrada = true;
         detener();
@@ -52,6 +54,7 @@ class PartidaCompartida extends ChangeNotifier {
       'No se pudo enviar el tablero. Inténtalo de nuevo.';
   static const errorAlConceder =
       'No se pudo conceder la partida. Inténtalo de nuevo.';
+  static const fallosParaAvisar = 2;
 
   final ServicioPartidas partidas;
   final Duration esperaReintento;
@@ -71,11 +74,15 @@ class PartidaCompartida extends ChangeNotifier {
   ErrorAutenticacion? _errorTurno;
 
   bool _concedi = false;
+  bool _salioPorInactividad = false;
+  int _fallosSeguidos = 0;
   bool _concediendo = false;
   ErrorAutenticacion? _errorConceder;
 
   bool get concedi => _concedi || (yo?.concedio ?? false);
   bool get concediendo => _concediendo;
+  bool get salioPorInactividad => _salioPorInactividad;
+  bool get sinConexion => !_cerrada && _fallosSeguidos >= fallosParaAvisar;
   ErrorAutenticacion? get errorConceder => _errorConceder;
 
   bool get puedoConceder =>
@@ -341,8 +348,29 @@ class PartidaCompartida extends ChangeNotifier {
     _reintento = null;
   }
 
+  void _alResponder() {
+    final avisaba = sinConexion;
+    _fallosSeguidos = 0;
+    if (_avisoPendiente != null && _reintento != null) _enviarAviso();
+    if (avisaba) notifyListeners();
+  }
+
+  void _alFallar(Object error) {
+    _fallosSeguidos++;
+    if (_fallosSeguidos == fallosParaAvisar) notifyListeners();
+  }
+
   void _recibirSala(SalaPartida sala) {
     _sala = sala;
+    _fallosSeguidos = 0;
+    if (!_concedi &&
+        !_concediendo &&
+        sala.comenzada &&
+        (yo?.concedio ?? false)) {
+      _salioPorInactividad = true;
+      _avisoPendiente = null;
+      detener();
+    }
     final aviso = _avisoPendiente;
     if (aviso != null &&
         (sala.terminada ||

@@ -10,6 +10,8 @@ import 'partidas_de_prueba.dart';
 class _Avisos {
   final cambios = <SalaPartida>[];
   int cierres = 0;
+  int respuestas = 0;
+  final fallos = <Object>[];
 }
 
 void main() {
@@ -25,6 +27,8 @@ void main() {
         codigo: 'K7M2QX',
         alCambiar: avisos.cambios.add,
         alCerrar: () => avisos.cierres++,
+        alResponder: () => avisos.respuestas++,
+        alFallar: avisos.fallos.add,
       )..iniciar();
       return (vigilante, servidor, avisos);
     }
@@ -128,6 +132,43 @@ void main() {
 
       expect(avisos.cierres, 0);
       expect(vigilante.activo, isTrue);
+      vigilante.detener();
+    });
+
+    testWidgets('Avisa cada respuesta aunque la sala no cambie', (
+      tester,
+    ) async {
+      final (vigilante, _, avisos) = await vigilar(
+        (_) => respuestaJson(salaJson(), 200),
+      );
+
+      await tester.pump(const Duration(seconds: 6));
+
+      expect(avisos.respuestas, 3);
+      expect(avisos.cambios, hasLength(1));
+      expect(avisos.fallos, isEmpty);
+      vigilante.detener();
+    });
+
+    testWidgets('Avisa cada consulta fallida sin dejar de consultar', (
+      tester,
+    ) async {
+      var hayRed = false;
+      final (vigilante, servidor, avisos) = await vigilar((_) {
+        if (!hayRed) throw http.ClientException('Connection refused');
+        return respuestaJson(salaJson(), 200);
+      });
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(avisos.fallos, hasLength(2));
+      expect(avisos.respuestas, 0);
+      expect(vigilante.activo, isTrue);
+
+      hayRed = true;
+      await tester.pump(const Duration(seconds: 2));
+      expect(servidor.peticiones, hasLength(3));
+      expect(avisos.fallos, hasLength(2));
+      expect(avisos.respuestas, 1);
       vigilante.detener();
     });
 

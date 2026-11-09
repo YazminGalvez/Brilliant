@@ -9,6 +9,8 @@ class VigilanteSala {
     required this.codigo,
     required this.alCambiar,
     required this.alCerrar,
+    this.alResponder,
+    this.alFallar,
     this.intervalo = const Duration(seconds: 2),
     SalaPartida? salaInicial,
   }) : _ultimaSala = salaInicial;
@@ -17,6 +19,8 @@ class VigilanteSala {
   final String codigo;
   final void Function(SalaPartida sala) alCambiar;
   final void Function() alCerrar;
+  final void Function()? alResponder;
+  final void Function(Object error)? alFallar;
   final Duration intervalo;
 
   Timer? _temporizador;
@@ -42,14 +46,22 @@ class VigilanteSala {
     _consultando = true;
     try {
       final sala = await partidas.consultar(codigo);
-      if (!activo || sala == _ultimaSala) return;
-      _ultimaSala = sala;
-      alCambiar(sala);
+      if (!activo) return;
+      if (sala != _ultimaSala) {
+        _ultimaSala = sala;
+        alCambiar(sala);
+      }
+      if (activo) alResponder?.call();
     } on ErrorAutenticacion catch (error) {
-      if (activo && error.codigoServidor == 'PARTIDA_NO_ENCONTRADA') {
+      if (!activo) return;
+      if (error.codigoServidor == 'PARTIDA_NO_ENCONTRADA') {
         detener();
         alCerrar();
+      } else {
+        alFallar?.call(error);
       }
+    } on Object catch (error) {
+      if (activo) alFallar?.call(error);
     } finally {
       _consultando = false;
     }
