@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/autenticacion.dart';
 import 'package:frontend/cliente_autenticacion.dart';
+import 'package:frontend/direccion_servidor.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const servidorDePrueba = 'http://127.0.0.1:8080';
 
@@ -534,6 +537,136 @@ void main() {
       );
 
       expect(cliente.servidor, servidorPorDefecto());
+    });
+  });
+
+  group('Probar conexión', () {
+    test('Con respuesta 200 de /api/v1/salud devuelve true', () async {
+      final servidor = ServidorFalso(
+        (_) => respuestaJson({'estado': 'ok'}, 200),
+      );
+
+      expect(await servidor.crearCliente().probarConexion(), isTrue);
+      final peticion = servidor.peticiones.single;
+      expect(peticion.method, 'GET');
+      expect(peticion.url.toString(), '$servidorDePrueba/api/v1/salud');
+    });
+
+    test('Con respuesta 500 devuelve false', () async {
+      final servidor = ServidorFalso((_) => respuestaJson({}, 500));
+
+      expect(await servidor.crearCliente().probarConexion(), isFalse);
+    });
+
+    test('Si la red falla devuelve false sin lanzar', () async {
+      final servidor = ServidorFalso(
+        (_) => throw http.ClientException('Connection refused'),
+      );
+
+      expect(await servidor.crearCliente().probarConexion(), isFalse);
+    });
+
+    test(
+      'Con una dirección inválida devuelve false sin hacer la petición',
+      () async {
+        final servidor = ServidorFalso((_) => respuestaJson({}, 200));
+
+        final cliente = servidor.crearCliente(servidor: 'http://[no válida');
+
+        expect(await cliente.probarConexion(), isFalse);
+        expect(servidor.peticiones, isEmpty);
+      },
+    );
+
+    testWidgets('Si el servidor tarda más de 5 segundos devuelve false', (
+      tester,
+    ) async {
+      final cliente = ClienteAutenticacion(
+        servidor: servidorDePrueba,
+        cliente: MockClient((_) => Completer<http.Response>().future),
+      );
+
+      bool? conectado;
+      unawaited(cliente.probarConexion().then((valor) => conectado = valor));
+      await tester.pump(const Duration(seconds: 4));
+      expect(conectado, isNull);
+
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(conectado, isFalse);
+    });
+  });
+
+  group('Dirección del servidor', () {
+    const guardada = 'http://192.168.1.50:8080';
+
+    test('En Android sin variable usa la dirección del emulador', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        expect(servidorPorDefecto(definido: ''), 'http://10.0.2.2:8080');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    test('En Windows sin variable usa localhost', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      try {
+        expect(servidorPorDefecto(definido: ''), 'http://localhost:8080');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    test('La variable SERVIDOR gana a la plataforma', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        expect(
+          servidorPorDefecto(definido: 'http://10.0.0.7:8080'),
+          'http://10.0.0.7:8080',
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    test('La variable SERVIDOR gana a la dirección guardada', () async {
+      SharedPreferences.setMockInitialValues({
+        DireccionServidor.clave: guardada,
+      });
+
+      expect(
+        await DireccionServidor.elegir(definido: 'http://10.0.0.7:8080'),
+        'http://10.0.0.7:8080',
+      );
+    });
+
+    test('Sin variable se usa la última dirección guardada', () async {
+      SharedPreferences.setMockInitialValues({
+        DireccionServidor.clave: guardada,
+      });
+
+      expect(await DireccionServidor.elegir(definido: ''), guardada);
+    });
+
+    test(
+      'Sin variable ni dirección guardada se usa la de por defecto',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+
+        expect(
+          await DireccionServidor.elegir(definido: ''),
+          servidorPorDefecto(definido: ''),
+        );
+      },
+    );
+
+    test('Guardar una dirección permite leerla después', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      await DireccionServidor.guardar(' $guardada ');
+
+      expect(await DireccionServidor.leer(), guardada);
     });
   });
 }

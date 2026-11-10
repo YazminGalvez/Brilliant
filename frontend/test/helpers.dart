@@ -73,6 +73,7 @@ int semillaParaTiradas(List<List<int>> objetivo) {
 
 Future<void> tocar(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
+  await tester.pump();
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }

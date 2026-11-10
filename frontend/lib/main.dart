@@ -7,6 +7,7 @@ import 'package:juego_brilliant/partida.dart';
 import 'package:juego_brilliant/validador_anclas.dart';
 import 'package:frontend/autenticacion.dart';
 import 'package:frontend/cliente_autenticacion.dart';
+import 'package:frontend/direccion_servidor.dart';
 import 'package:frontend/inicio_sesion.dart';
 import 'package:frontend/lanzamiento_dados.dart';
 import 'package:frontend/panel_historial_lanzamientos.dart';
@@ -27,8 +28,10 @@ Color colorDeZona(ColorZona color) => switch (color) {
   ColorZona.naranja => const Color(0xFFFFEDD5),
 };
 
-void main() {
-  runApp(MainApp(servicio: ClienteAutenticacion()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final servidor = await DireccionServidor.elegir();
+  runApp(MainApp(servicio: ClienteAutenticacion(servidor: servidor)));
 }
 
 class MainApp extends StatelessWidget {

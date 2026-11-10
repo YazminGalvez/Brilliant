@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class SesionUsuario {
   const SesionUsuario({
     required this.token,
@@ -41,11 +43,17 @@ abstract class ServicioAutenticacion {
     String ruta, {
     Map<String, Object?>? cuerpo,
   });
+
+  Future<bool> probarConexion() async => true;
 }
 
-String servidorPorDefecto() {
-  const servidor = String.fromEnvironment('SERVIDOR');
-  if (servidor.isNotEmpty) return servidor;
+const servidorDefinido = String.fromEnvironment('SERVIDOR');
+
+String servidorPorDefecto({String definido = servidorDefinido}) {
+  if (definido.isNotEmpty) return definido;
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    return 'http://10.0.2.2:8080';
+  }
 
   final host = Uri.base.host;
   return 'http://${host.isEmpty ? 'localhost' : host}:8080';

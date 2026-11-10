@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:juego_brilliant/color_zona.dart';
 import 'package:frontend/autenticacion.dart';
+import 'package:frontend/direccion_servidor.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/registro.dart';
 
@@ -57,14 +59,6 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
   String? _validarContrasena(String? valor) =>
       (valor ?? '').isEmpty ? 'Escribe tu contraseña.' : null;
 
-  String? _validarServidor(String? valor) {
-    final direccion = (valor ?? '').trim();
-    if (direccion.startsWith('http://') || direccion.startsWith('https://')) {
-      return null;
-    }
-    return 'Debe empezar por http:// o https://';
-  }
-
   Future<void> _entrar() async {
     if (_enviando) return;
 
@@ -82,6 +76,7 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
         _usuario.text.trim(),
         _contrasena.text,
       );
+      unawaited(DireccionServidor.guardar(widget.servicio.servidor));
       if (!mounted) return;
       TextInput.finishAutofillContext();
       Navigator.of(
@@ -96,9 +91,9 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
     }
   }
 
-  void _abrirRegistro() {
+  Future<void> _abrirRegistro() async {
     widget.servicio.servidor = _servidor.text.trim();
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => RegistroPage(
           servicio: widget.servicio,
@@ -106,6 +101,8 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
         ),
       ),
     );
+    if (!mounted) return;
+    _servidor.text = widget.servicio.servidor;
   }
 
   void _mostrarFallo(String mensaje) {
@@ -121,7 +118,6 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
     final tema = Theme.of(context);
     final colores = tema.colorScheme;
     final error = _error;
-    final errorServidor = _validarServidor(_servidor.text);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -218,39 +214,11 @@ class _InicioSesionPageState extends State<InicioSesionPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ExpansionTile(
-                      title: const Text('Servidor'),
-                      subtitle: Text(
-                        errorServidor ?? _servidor.text.trim(),
-                        style: TextStyle(
-                          color: errorServidor == null
-                              ? colores.onSurfaceVariant
-                              : colores.error,
-                        ),
-                      ),
-                      leading: const Icon(Icons.dns_outlined),
-                      tilePadding: EdgeInsets.zero,
-                      childrenPadding: const EdgeInsets.only(bottom: 8),
-                      shape: const Border(),
-                      collapsedShape: const Border(),
-                      maintainState: true,
-                      children: [
-                        TextFormField(
-                          key: const Key('login-servidor'),
-                          controller: _servidor,
-                          validator: _validarServidor,
-                          readOnly: _enviando,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          keyboardType: TextInputType.url,
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            labelText: 'Dirección del servidor',
-                            hintText: 'http://localhost:8080',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ],
+                    CampoServidor(
+                      prefijo: 'login',
+                      controlador: _servidor,
+                      servicio: widget.servicio,
+                      soloLectura: _enviando,
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 8),

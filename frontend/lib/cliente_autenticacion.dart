@@ -11,6 +11,7 @@ class ClienteAutenticacion implements ServicioAutenticacion {
   }
 
   static const limiteDeTiempo = Duration(seconds: 10);
+  static const limiteDePrueba = Duration(seconds: 5);
 
   static const mensajeCredenciales = 'Usuario o contraseña incorrectos.';
   static const mensajeContrasenaIncorrecta = 'Contraseña incorrecta.';
@@ -192,6 +193,21 @@ class ClienteAutenticacion implements ServicioAutenticacion {
       mensajeRespuestaInesperada,
       codigo: respuesta.statusCode,
     );
+  }
+
+  @override
+  Future<bool> probarConexion() async {
+    try {
+      final respuesta = await _cliente
+          .get(
+            Uri.parse('$servidor/api/v1/salud'),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(limiteDePrueba);
+      return respuesta.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<http.Response> _enviar(

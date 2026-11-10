@@ -3,16 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/autenticacion.dart';
+import 'package:frontend/direccion_servidor.dart';
 import 'package:frontend/inicio_sesion.dart';
 import 'package:frontend/main.dart';
 import 'package:frontend/proveedor_autenticacion.dart';
 import 'package:frontend/registro.dart';
 import 'package:frontend/seleccion_mapa.dart';
 import 'package:frontend/vigilante_sesion.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers.dart';
 
-class ServicioFalso implements ServicioAutenticacion {
+class ServicioFalso extends ServicioAutenticacion {
   ServicioFalso({SesionUsuario? sesion}) : _sesion = sesion;
 
   @override
@@ -32,6 +34,16 @@ class ServicioFalso implements ServicioAutenticacion {
   ErrorAutenticacion? errorAlRevisar;
   bool sesionSigueActiva = true;
   Completer<void>? esperaAlIniciar;
+  bool hayConexion = true;
+  Completer<void>? esperaAlProbar;
+  final direccionesProbadas = <String>[];
+
+  @override
+  Future<bool> probarConexion() async {
+    direccionesProbadas.add(servidor);
+    await esperaAlProbar?.future;
+    return hayConexion;
+  }
 
   @override
   SesionUsuario? get sesion => _sesion;
@@ -603,6 +615,238 @@ void main() {
 
         expect(menuDeMapas, findsOneWidget);
         expect(botonCuenta, findsNothing);
+      },
+    );
+  });
+
+  group('Widgets: dirección del servidor', () {
+    const direccionLaptop = 'http://192.168.1.50:8080';
+    final botonProbar = find.byKey(const Key('login-probar-conexion'));
+    final estadoServidor = find.byKey(const Key('login-estado-servidor'));
+
+    Future<String?> direccionGuardada() async =>
+        (await SharedPreferences.getInstance()).getString(
+          DireccionServidor.clave,
+        );
+
+    Future<void> escribirServidor(WidgetTester tester, String direccion) async {
+      await tocar(tester, find.text('Servidor'));
+      await tester.enterText(campoServidor, direccion);
+      await tester.pump();
+    }
+
+    String mensajeDe(WidgetTester tester) =>
+        tester.widget<Text>(estadoServidor).data!;
+
+    String servidorPlegado(WidgetTester tester, Key clave) => tester
+        .widget<TextFormField>(find.byKey(clave, skipOffstage: false))
+        .controller!
+        .text;
+
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    testWidgets(
+      'Probar conexión con el servidor encendido dice Conectado y guarda la dirección',
+      (tester) async {
+        final servicio = ServicioFalso();
+        await abrirJuego(tester, servicio);
+        await escribirServidor(tester, direccionLaptop);
+
+        await tocar(tester, botonProbar);
+
+        expect(servicio.direccionesProbadas, [direccionLaptop]);
+        expect(mensajeDe(tester), 'Conectado al servidor');
+        expect(await direccionGuardada(), direccionLaptop);
+      },
+    );
+
+    testWidgets(
+      'Probar conexión sin servidor explica qué revisar y no guarda la dirección',
+      (tester) async {
+        final servicio = ServicioFalso()..hayConexion = false;
+        await abrirJuego(tester, servicio);
+        await escribirServidor(tester, direccionLaptop);
+
+        await tocar(tester, botonProbar);
+
+        expect(mensajeDe(tester), EstadoServidor.mensajeSinConexion);
+        expect(mensajeDe(tester), contains('misma red'));
+        expect(await direccionGuardada(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Probar conexión con una dirección inválida no hace la petición',
+      (tester) async {
+        final servicio = ServicioFalso();
+        await abrirJuego(tester, servicio);
+        await escribirServidor(tester, 'http://');
+
+        await tocar(tester, botonProbar);
+
+        expect(servicio.direccionesProbadas, isEmpty);
+        expect(mensajeDe(tester), EstadoServidor.mensajeInvalida);
+        expect(servicio.servidor, 'http://127.0.0.1:8080');
+      },
+    );
+
+    testWidgets(
+      'Mientras prueba la conexión el botón queda deshabilitado con un indicador',
+      (tester) async {
+        final espera = Completer<void>();
+        final servicio = ServicioFalso()..esperaAlProbar = espera;
+        await abrirJuego(tester, servicio);
+        await escribirServidor(tester, direccionLaptop);
+
+        await tester.tap(botonProbar);
+        await tester.pump();
+
+        expect(tester.widget<ButtonStyleButton>(botonProbar).onPressed, isNull);
+        expect(
+          find.descendant(
+            of: botonProbar,
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.widget<FilledButton>(botonEntrar).onPressed, isNotNull);
+
+        espera.complete();
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.widget<ButtonStyleButton>(botonProbar).onPressed,
+          isNotNull,
+        );
+        expect(mensajeDe(tester), 'Conectado al servidor');
+      },
+    );
+
+    testWidgets('Cambiar la dirección después de probar borra el mensaje', (
+      tester,
+    ) async {
+      await abrirJuego(tester, ServicioFalso());
+      await escribirServidor(tester, direccionLaptop);
+      await tocar(tester, botonProbar);
+
+      await tester.enterText(campoServidor, 'http://192.168.1.51:8080');
+      await tester.pump();
+
+      expect(estadoServidor, findsNothing);
+    });
+
+    testWidgets('Iniciar sesión con éxito guarda la dirección del servidor', (
+      tester,
+    ) async {
+      await abrirJuego(tester, ServicioFalso());
+      await escribirServidor(tester, direccionLaptop);
+
+      await entrar(tester);
+
+      expect(menuDeMapas, findsOneWidget);
+      expect(await direccionGuardada(), direccionLaptop);
+    });
+
+    testWidgets('Si el inicio de sesión falla no guarda la dirección', (
+      tester,
+    ) async {
+      final servicio = ServicioFalso()
+        ..errorAlIniciar = const ErrorAutenticacion(
+          'No se pudo conectar con el servidor.',
+        );
+      await abrirJuego(tester, servicio);
+      await escribirServidor(tester, direccionLaptop);
+
+      await entrar(tester);
+
+      expect(errorDeInicio, findsOneWidget);
+      expect(await direccionGuardada(), isNull);
+    });
+
+    testWidgets(
+      'Registro muestra la misma dirección y al crear la cuenta la guarda',
+      (tester) async {
+        final servicio = ServicioFalso()..servidor = direccionLaptop;
+        await abrirRegistro(tester, servicio);
+
+        expect(
+          servidorPlegado(tester, const Key('registro-servidor')),
+          direccionLaptop,
+        );
+        expect(
+          find.byKey(
+            const Key('registro-probar-conexion'),
+            skipOffstage: false,
+          ),
+          findsOneWidget,
+        );
+
+        await tester.enterText(
+          find.byKey(const Key('registro-usuario')),
+          'ana_nueva',
+        );
+        await tester.enterText(
+          find.byKey(const Key('registro-contrasena')),
+          'secreta123',
+        );
+        await tester.enterText(
+          find.byKey(const Key('registro-repetir')),
+          'secreta123',
+        );
+        await tocar(tester, find.byKey(const Key('registro-crear')));
+
+        expect(menuDeMapas, findsOneWidget);
+        expect(await direccionGuardada(), direccionLaptop);
+      },
+    );
+
+    testWidgets('Si crear la cuenta falla no guarda la dirección', (
+      tester,
+    ) async {
+      final servicio = ServicioFalso()
+        ..servidor = direccionLaptop
+        ..errorAlCrear = const ErrorAutenticacion(
+          'Ese nombre de usuario ya está en uso.',
+        );
+      await abrirRegistro(tester, servicio);
+
+      await tester.enterText(
+        find.byKey(const Key('registro-usuario')),
+        'ana_nueva',
+      );
+      await tester.enterText(
+        find.byKey(const Key('registro-contrasena')),
+        'secreta123',
+      );
+      await tester.enterText(
+        find.byKey(const Key('registro-repetir')),
+        'secreta123',
+      );
+      await tocar(tester, find.byKey(const Key('registro-crear')));
+
+      expect(find.byKey(const Key('registro-error')), findsOneWidget);
+      expect(await direccionGuardada(), isNull);
+    });
+
+    testWidgets(
+      'La dirección cambiada en registro aparece al volver al inicio de sesión',
+      (tester) async {
+        final servicio = ServicioFalso();
+        await abrirRegistro(tester, servicio);
+        await tocar(tester, find.text('Servidor'));
+        await tester.enterText(
+          find.byKey(const Key('registro-servidor')),
+          direccionLaptop,
+        );
+        await tocar(tester, find.byKey(const Key('registro-probar-conexion')));
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(
+          servidorPlegado(tester, const Key('login-servidor')),
+          direccionLaptop,
+        );
       },
     );
   });

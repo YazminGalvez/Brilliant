@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/autenticacion.dart';
+import 'package:frontend/direccion_servidor.dart';
 import 'package:frontend/inicio_sesion.dart';
 
 final _caracteresDeUsuario = RegExp(r'^[A-Za-z0-9_-]+$');
@@ -49,6 +51,7 @@ class _RegistroPageState extends State<RegistroPage> {
   final _usuario = TextEditingController();
   final _contrasena = TextEditingController();
   final _repetir = TextEditingController();
+  late final TextEditingController _servidor;
 
   bool _mostrarContrasena = false;
   bool _enviando = false;
@@ -56,10 +59,17 @@ class _RegistroPageState extends State<RegistroPage> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _servidor = TextEditingController(text: widget.servicio.servidor);
+  }
+
+  @override
   void dispose() {
     _usuario.dispose();
     _contrasena.dispose();
     _repetir.dispose();
+    _servidor.dispose();
     super.dispose();
   }
 
@@ -76,6 +86,7 @@ class _RegistroPageState extends State<RegistroPage> {
     setState(() => _intentoEnviar = true);
     if (!_formulario.currentState!.validate()) return;
 
+    widget.servicio.servidor = _servidor.text.trim();
     setState(() {
       _enviando = true;
       _error = null;
@@ -83,6 +94,7 @@ class _RegistroPageState extends State<RegistroPage> {
 
     try {
       await widget.servicio.crearCuenta(_usuario.text.trim(), _contrasena.text);
+      unawaited(DireccionServidor.guardar(widget.servicio.servidor));
       if (!mounted) return;
       TextInput.finishAutofillContext();
       Navigator.of(context).pushAndRemoveUntil(
@@ -226,6 +238,13 @@ class _RegistroPageState extends State<RegistroPage> {
                         prefixIcon: Icon(Icons.lock_outline),
                         border: OutlineInputBorder(),
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    CampoServidor(
+                      prefijo: 'registro',
+                      controlador: _servidor,
+                      servicio: widget.servicio,
+                      soloLectura: _enviando,
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 16),
